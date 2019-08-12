@@ -6,6 +6,7 @@
 #install.packages('stringr', repos='http://cran.us.r-project.org')
 
 library(dplyr)
+library(stringr)
 library(reshape2)
 library(ggplot2)
 library(data.table)
