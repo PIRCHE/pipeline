@@ -44,52 +44,74 @@ def rest_request(url, username, password, api_key, api_req_payload):
 
 def get_api_requests_payload(raw_input_data):
 
-    input_count = 0
     donor_data = []
     api_requests = []
+
     for content in raw_input_data.values():
-        if (input_count % 2) == 0:
-            patient_data = get_person_data(content)
-        else:
-            donor_data.append(get_person_data(content))
-            api_request = {'patient': patient_data, 'donors': donor_data}
-            api_requests.append(api_request)
-            donor_data = []
-        input_count += 1
+        tx_data = get_tx_data(content)
+        patient_data = {'id': tx_data['patient']['id'], 'population': tx_data['patient']['population'], 'glString': tx_data['patient']['glString']}
+        donor_data.append({'id': tx_data['donor']['id'], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['glString']})
+        api_request = {'patient': patient_data, 'donors': donor_data}
+        api_requests.append(api_request)
+        donor_data = []
 
     return api_requests
 
 
-def get_person_data(raw_person_data):
+def get_tx_data(raw_tx_data):
 
-    row_count = 0
-    tuple_count = 1
-    gl_string = ""
-    for row_element in raw_person_data.values():
-        if row_count == 0:
-            person_id = row_element
-        else:
-            if tuple_count == 1:
-                if row_element:
-                    gl_string += row_element + "+"
-                tuple_count += 1
-            else:
-                if row_element:
-                    gl_string += row_element + "^"
-                tuple_count = 1
-        row_count += 1
+    p_id = raw_tx_data["pid"]
+    d_id = raw_tx_data["did"]
 
-    # remove trailing element
-    gl_string = gl_string[:-1]
+    ploc_a = {'A1': raw_tx_data["pA1"], 'A2': raw_tx_data["pA2"]}
+    ploc_b = {'B1': raw_tx_data["pB1"], 'B2': raw_tx_data["pB2"]}
+    ploc_c = {'C1': raw_tx_data["pC1"], 'C2': raw_tx_data["pC2"]}
+    ploc_drb = {'DRB11': raw_tx_data["pDRB11"], 'DRB12': raw_tx_data["pDRB12"]}
+    ploc_dqb = {'DQB11': raw_tx_data["pDQB11"], 'DQB12': raw_tx_data["pDQB12"]}
+
+    p_hla = {'A': ploc_a, 'B': ploc_b, 'C': ploc_c, 'DRB1': ploc_drb, 'DQB1': ploc_dqb}
+
+    dloc_a = {'A1': raw_tx_data["dA1"], 'A2': raw_tx_data["dA2"]}
+    dloc_b = {'B1': raw_tx_data["dB1"], 'B2': raw_tx_data["dB2"]}
+    dloc_c = {'C1': raw_tx_data["dC1"], 'C2': raw_tx_data["dC2"]}
+    dloc_drb = {'DRB11': raw_tx_data["dDRB11"], 'DRB12': raw_tx_data["dDRB12"]}
+    dloc_dqb = {'DQB11': raw_tx_data["dDQB11"], 'DQB12': raw_tx_data["dDQB12"]}
+
+    d_hla = {'A': dloc_a, 'B': dloc_b, 'C': dloc_c, 'DRB1': dloc_drb, 'DQB1': dloc_dqb}
+
+    p_gl_string = build_gl_string(p_hla)
+    d_gl_string = build_gl_string(d_hla)
 
     if not args.population:
         population = 'NMDP EUR haplotypes (2007)'
     else:
         population = args.population
 
-    person_data = {'id': person_id, 'population': population, 'glString': gl_string}
+    pat_data = {'id': p_id, 'population': population, 'hla': p_hla, 'glString': p_gl_string}
+    don_data = {'id': d_id, 'population': population, 'hla': d_hla, 'glString': d_gl_string}
+    tx_data = {'patient': pat_data, 'donor': don_data}
 
-    return person_data
+    return tx_data
+
+
+def build_gl_string(hla):
+
+    gl_string = ""
+    for locus in hla.values():
+        allele_count = 0
+        for allele in locus.values():
+            allele_count += 1
+            if allele_count == 1:
+                if allele:
+                    gl_string += allele + "+"
+            else:
+                if allele:
+                    gl_string += allele + "^"
+
+    # remove trailing element
+    gl_string = gl_string[:-1]
+
+    return gl_string
 
 
 if __name__ == '__main__':
@@ -112,7 +134,8 @@ if __name__ == '__main__':
 
     raw_csv_data = {}
 
-    referenceHeader = 'id,A1,A2,B1,B2,C1,C2,DRB11,DRB12,DQB11,DQB12'
+    referenceHeader = 'pid,pA1,pA2,pB1,pB2,pC1,pC2,pDRB11,pDRB12,pDQB11,pDQB12,' \
+                      'did,dA1,dA2,dB1,dB2,dC1,dC2,dDRB11,dDRB12,dDQB11,dDQB12'
     with open(args.input, 'r') as csv_file:
         csv_reader = csv.DictReader(csv_file)
         rawHeader = csv_reader.fieldnames
@@ -124,8 +147,10 @@ if __name__ == '__main__':
             line_count = 0
             for row in csv_reader:
                 if verbose:
-                    print(f'raw_csv_row: {row["id"]} {row["A1"]} {row["A2"]} {row["B1"]} {row["B2"]} {row["C1"]}'
-                          f' {row["C2"]} {row["DRB11"]} {row["DRB12"]} {row["DQB11"]} {row["DQB12"]}')
+                    print(f'raw_csv_row: {row["pid"]} {row["pA1"]} {row["pA2"]} {row["pB1"]} {row["pB2"]} {row["pC1"]}'
+                          f' {row["pC2"]} {row["pDRB11"]} {row["pDRB12"]} {row["pDQB11"]} {row["pDQB12"]}'
+                          f' {row["did"]} {row["dA1"]} {row["dA2"]} {row["dB1"]} {row["dB2"]} {row["dC1"]}'
+                          f' {row["dC2"]} {row["dDRB11"]} {row["dDRB12"]} {row["dDQB11"]} {row["dDQB12"]}')
                 raw_csv_data[line_count] = row
                 line_count += 1
             print(f'Processed {line_count} lines.')
