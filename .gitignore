@@ -1,2 +1,4 @@
 .idea
 pipeline.iml
+venv
+local

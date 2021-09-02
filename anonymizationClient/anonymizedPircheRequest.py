@@ -2,6 +2,7 @@ import argparse
 import requests
 import csv
 import json
+import xlrd
 
 
 def rest_request(url, username, password, api_key, api_req_payload):
@@ -39,7 +40,7 @@ def rest_request(url, username, password, api_key, api_req_payload):
         print('api_req_status: ', r.status_code)
         print("api_req_response: ", r.text)
 
-    return r.text
+    return r
 
 
 def get_api_requests_payload(raw_input_data):
@@ -59,6 +60,8 @@ def get_api_requests_payload(raw_input_data):
 
 
 def get_tx_data(raw_tx_data):
+
+    check_unsupported_loci(raw_tx_data)
 
     p_id = raw_tx_data["pid"]
     d_id = raw_tx_data["did"]
@@ -94,6 +97,23 @@ def get_tx_data(raw_tx_data):
     return tx_data
 
 
+def check_unsupported_loci(raw_tx_data):
+    if raw_tx_data["pDRB31"] or raw_tx_data["pDRB32"] \
+            or raw_tx_data["pDRB41"] or raw_tx_data["pDRB42"] \
+            or raw_tx_data["pDRB51"] or raw_tx_data["pDRB52"] \
+            or raw_tx_data["pDQA11"] or raw_tx_data["pDQA12"] \
+            or raw_tx_data["pDPA11"] or raw_tx_data["pDPA12"] \
+            or raw_tx_data["pDPB11"] or raw_tx_data["pDPB12"] \
+            or raw_tx_data["dDRB31"] or raw_tx_data["dDRB32"] \
+            or raw_tx_data["dDRB41"] or raw_tx_data["dDRB42"] \
+            or raw_tx_data["dDRB51"] or raw_tx_data["dDRB52"] \
+            or raw_tx_data["dDQA11"] or raw_tx_data["dDQA12"] \
+            or raw_tx_data["dDPA11"] or raw_tx_data["dDPA12"] \
+            or raw_tx_data["dDPB11"] or raw_tx_data["dDPB12"]:
+        print('INFO: Only the locus A, B, C, DRB1 and DQB1 are supported '
+              'the hla data of other locus will be ignored.')
+
+
 def build_gl_string(hla):
 
     gl_string = ""
@@ -114,6 +134,103 @@ def build_gl_string(hla):
     return gl_string
 
 
+def cleanHLA(locus, allele):
+    allele = allele.replace("g", "")
+    if "*" in allele:
+        allele = allele[allele.index("*") + 1:]
+    if ":" not in allele:
+        if len(allele) > 3:
+            allele = allele[0:2] + ":" + allele[2:4]
+        else:
+            print("ERROR: cannot clean " + locus + " " + allele)
+    return locus + "*" + allele.replace("g", "")
+
+
+def build_genotypes():
+
+    # read files
+    spacer = '-'*40
+    if verbose:
+        print("read haplotype file")
+        print(spacer)
+
+    workbook = xlrd.open_workbook(args.haplotypes)
+    worksheet = workbook.sheet_by_index(0)
+
+    header = worksheet.row(0)
+    freq_suffix = "_freq"
+    rank_suffix = "_rank"
+
+    col_idx = {}
+    for idx, cell_obj in enumerate(header):
+        if verbose:
+            print(str(idx) + " -> " + cell_obj.value)
+        col_idx[cell_obj.value] = idx
+    if verbose:
+        print(spacer)
+
+    haplotypes = []
+
+    for row_idx in range(1, worksheet.nrows):
+        if worksheet.cell(row_idx, col_idx[args.population_short + rank_suffix]).value != "NA":
+            haplotype = {
+                'id': row_idx,
+                'A':  cleanHLA("A", worksheet.cell(row_idx, col_idx["A"]).value),
+                'B':  cleanHLA("B", worksheet.cell(row_idx, col_idx["B"]).value),
+                'C':  cleanHLA("C", worksheet.cell(row_idx, col_idx["C"]).value),
+                'DRB1':  cleanHLA("DRB1", worksheet.cell(row_idx, col_idx["DRB1"]).value),
+                'DQB1':  cleanHLA("DQB1", worksheet.cell(row_idx, col_idx["DQB1"]).value),
+                'freq':  float(worksheet.cell(row_idx, col_idx[args.population_short + freq_suffix]).value),
+            }
+            haplotypes.append(haplotype)
+
+    if verbose:
+        print("read " + str(len(haplotypes)) + " haplotypes")
+        print(spacer)
+
+    haplotypes.sort(key=lambda x: x['freq'], reverse=True)
+
+    genotypes = []
+    genotypes_count = 0
+    threshold = float(args.threshold)
+    cumulated_left = 0.
+    #with open(args.output, "w") as output:
+        #writer = csv.writer(output, delimiter=',')
+        #writer.writerow(["genotype", "A1", "A2", "B1", "B2", "C1", "C2", "DRB11", "DRB12", "DQB11", "DQB12", "freq"])
+    for left in haplotypes:
+        cumulated_left += left['freq']
+        #if cumulated_left < threshold and verbose:
+            #print("Remaining frequency " + "{:.5f}".format(threshold - cumulated_left))
+        cumulated_right = 0.
+        for right in haplotypes:
+            cumulated_right += right['freq']
+            if cumulated_left < threshold and cumulated_right < threshold and left['id'] != right['id']:
+                #writer.writerow([str(left['id']) + "-" + str(right['id']), left['A'], right['A'], left['B'], right['B'], left['C'], right['C'], left['DRB1'], right['DRB1'], left['DQB1'], right['DQB1'], left['freq'] * right['freq']])
+                genotype = {'id': str(left['id']) + "-" + str(right['id']), 'A1': left['A'], 'A2': right['A'], 'B1': left['B'], 'B2': right['B'], 'C1': left['C'], 'C2': right['C'], 'DRB11': left['DRB1'], 'DRB12': right['DRB1'], 'DQB12': left['DQB1'], 'DQB12': right['DQB1'], 'freq': left['freq'] * right['freq']}
+                genotypes.append(genotype)
+                genotypes_count += 1
+
+    if verbose:
+        print(spacer)
+        print("created " + str(genotypes_count) + " genotypes based on threshold of " + str(threshold))
+        print(spacer)
+        print("successfully stored genotypes in file")
+        print(spacer)
+
+
+def write_results(match_results):
+    with open(args.output, "w") as output:
+        writer = csv.writer(output, delimiter=',')
+        writer.writerow(["id", "p1_A", "p1_B", "p1_C", "p1_DRB1", "p1_DRB3", "p1_DRB4", "p1_DRB5", "p1_DPA1", "p1_DPB1", "p1_DQA1", "p1_DQB1", "p1_SUM"
+                            , "p2_A", "p2_B", "p2_C", "p2_DRB1", "p2_DRB3", "p2_DRB4", "p2_DRB5", "p2_DPA1", "p2_DPB1", "p2_DQA1", "p2_DQB1", "p2_SUM"])
+
+        for match_result in match_results:
+            p1_scores = match_result['pircheI_scores']
+            p2_scores = match_result['pircheII_scores']
+            writer.writerow([str(match_result['id']), p1_scores['A'], p1_scores['B'], p1_scores['C'], p1_scores['DRB1'], p1_scores['DRB3'], p1_scores['DRB4'], p1_scores['DRB5'], p1_scores['DPA1'], p1_scores['DPB1'], p1_scores['DQA1'], p1_scores['DQB1'], p1_scores['sum']
+                            , p2_scores['A'], p2_scores['B'], p2_scores['C'], p2_scores['DRB1'], p2_scores['DRB3'], p2_scores['DRB4'], p2_scores['DRB5'], p2_scores['DPA1'], p2_scores['DPB1'], p2_scores['DQA1'], p2_scores['DQB1'], p2_scores['sum']])
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -125,6 +242,10 @@ if __name__ == '__main__':
     parser.add_argument("-k", "--apikey", help="api key", type=str)
     parser.add_argument("-i", "--input", help="typing data input", type=str, required=True)
     parser.add_argument("-pp", "--population", help="population", type=str)
+    parser.add_argument("-hp", "--haplotypes", help="NMDP haplotype table (either 2007 or 2011 or equally formatted)", required=True)
+    parser.add_argument("-t", "--threshold", help="frequency threshold for haplotypes 0.0 to 1.0", required=True)
+    parser.add_argument("-ps", "--population_short", help="population short code as used in the header row", required=True)
+    parser.add_argument("-o", "--output", help="output file name", required=True)
 
     args = parser.parse_args()
 
@@ -132,10 +253,15 @@ if __name__ == '__main__':
     if verbose:
         print("verbose mode active")
 
+    build_genotypes()
+
     raw_csv_data = {}
 
-    referenceHeader = 'pid,pA1,pA2,pB1,pB2,pC1,pC2,pDRB11,pDRB12,pDQB11,pDQB12,' \
-                      'did,dA1,dA2,dB1,dB2,dC1,dC2,dDRB11,dDRB12,dDQB11,dDQB12'
+    referenceHeader = 'pid,pA1,pA2,pB1,pB2,pC1,pC2,pDRB11,pDRB12,pDRB31,pDRB32,pDRB41,pDRB42,pDRB51,pDRB52,' \
+                      'pDQA11,pDQA12,pDQB11,pDQB12,pDPA11,pDPA12,pDPB11,pDPB12,' \
+                      'did,dA1,dA2,dB1,dB2,dC1,dC2,dDRB11,dDRB12,dDRB31,dDRB32,dDRB41,dDRB42,dDRB51,dDRB52,' \
+                      'dDQA11,dDQA12,dDQB11,dDQB12,dDPA11,dDPA12,dDPB11,dDPB12'
+
     with open(args.input, 'r') as csv_file:
         csv_reader = csv.DictReader(csv_file)
         rawHeader = csv_reader.fieldnames
@@ -159,5 +285,13 @@ if __name__ == '__main__':
 
     api_requests_payload = get_api_requests_payload(raw_csv_data)
 
+    results = []
     for api_request_payload in api_requests_payload:
-        rest_request(args.url, args.user, args.password, args.apikey, api_request_payload)
+        response = rest_request(args.url, args.user, args.password, args.apikey, api_request_payload)
+        response_raw = response.json()
+        response_raw_p1 = response_raw["pircheI"]
+        response_raw_p2 = response_raw["pircheII"]
+        result_data = {'id': list(response_raw_p1.keys())[0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
+        results.append(result_data)
+
+    write_results(results)
