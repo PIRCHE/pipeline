@@ -15,8 +15,8 @@ Just run the script locally and provide all parameters needed. The results will 
 
 Script Parameters:
 
-| Short | Long              |Required| Description
-|------:|-------------:     |:------:|:                                                                                     -----|
+| Short | Long              |Required| Description                                                                               |
+|------:|-------------:     |:------:|:-----                                                                                     |
 | -v    | --verbose         |        |Verbose mode                                                                               |
 | -url  | --url             | x      |URL to the PIRCHE web service                                                              |
 | -u    | --user            | o      |PIRCHE web service user*                                                                   |
@@ -27,7 +27,7 @@ Script Parameters:
 | -hp   | --haplotypes      | x      |NMDP haplotype table (either 2007 or 2011 or equally formatted)                            |
 | -t    | --threshold       | x      |Frequency threshold for haplotypes generation 0.0 to 1.0                                   |
 | -ps   | --population_short| x      |Population short code as used in the NMDP haplotype table header row                       |
-| -o    | --output          | x      |Output file name                   |
+| -o    | --output          | x      |Output file name                                                                           |
 *only either of user & password or api key credentials are needed
 
 Example call:<br>
