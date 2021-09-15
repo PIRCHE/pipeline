@@ -3,6 +3,8 @@ import requests
 import csv
 import json
 import xlrd
+import random
+import operator
 
 
 def rest_request(url, username, password, api_key, api_req_payload):
@@ -43,18 +45,21 @@ def rest_request(url, username, password, api_key, api_req_payload):
     return r
 
 
-def get_api_requests_payload(raw_input_data):
+def get_api_requests_payload(raw_input_data, genotype_data):
 
-    donor_data = []
+    api_donor_data = []
     api_requests = []
 
     for content in raw_input_data.values():
         tx_data = get_tx_data(content)
         patient_data = {'id': tx_data['patient']['id'], 'population': tx_data['patient']['population'], 'glString': tx_data['patient']['glString']}
-        donor_data.append({'id': tx_data['donor']['id'], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['glString']})
-        api_request = {'patient': patient_data, 'donors': donor_data}
+        api_donor_data.append(({'id': tx_data['donor']['id'], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['glString']}))
+        if args.anonymization:
+            fk_data = get_fk_data(tx_data, genotype_data)
+            api_requests.extend(fk_data)
+        api_request = {'patient': patient_data, 'donors': api_donor_data}
         api_requests.append(api_request)
-        donor_data = []
+        api_donor_data = []
 
     return api_requests
 
@@ -96,6 +101,123 @@ def get_tx_data(raw_tx_data):
 
     return tx_data
 
+
+def get_fk_data(tx_data, genotype_data):
+
+    fk_data = []
+    num_fk_genotypes = 5
+
+    p_hla_tx = tx_data['patient']['hla']
+    d_hla_tx = tx_data['donor']['hla']
+
+    genotypes = genotype_data['genotypes']
+
+    p_genotypes = get_genotype_subset(p_hla_tx, genotypes, num_fk_genotypes)
+    d_genotypes = get_genotype_subset(d_hla_tx, genotypes, num_fk_genotypes)
+
+    for idx in range(num_fk_genotypes):
+        api_don_data = []
+        pat_data = genotype_to_person_data(p_genotypes[idx])
+        api_don_data.append(genotype_to_person_data(d_genotypes[idx]))
+        fk_data.append({'patient': pat_data, 'donors': api_don_data})
+
+    return fk_data
+
+
+def get_genotype_subset(hla_tx, genotypes, k_genotypes):
+
+    hlas = []
+
+    for loci in hla_tx.values():
+        # TODO handle/ignore empty loci/allele value
+        hlas.append(loci)
+
+    hlas_sel = random.sample(hlas, 2)
+
+    for idx, item in enumerate(hlas_sel[0].items()):
+        if idx == 0:
+            ref_loc1_k1 = item[0]
+            ref_loc1_v1 = item[1]
+        elif idx == 1:
+            ref_loc1_k2 = item[0]
+            ref_loc1_v2 = item[1]
+
+    for idx, item in enumerate(hlas_sel[1].items()):
+        if idx == 0:
+            ref_loc2_k1 = item[0]
+            ref_loc2_v1 = item[1]
+        elif idx == 1:
+            ref_loc2_k2 = item[0]
+            ref_loc2_v2 = item[1]
+
+    if verbose:
+        print('refloc1_key1: ' + ref_loc1_k1 + ' -- refloc1_value1: ' + ref_loc1_v1)
+        #print('refloc1_key2: ' + ref_loc1_k2 + ' -- refloc1_value2: ' + ref_loc1_v2)
+        #print('refloc2_key1: ' + ref_loc2_k1 + ' -- refloc2_value1: ' + ref_loc2_v1)
+        #print('refloc2_key2: ' + ref_loc2_k2 + ' -- refloc2_value2: ' + ref_loc2_v2)
+
+        print('genotype_len: ', len(genotypes))
+
+    genotype_subset = [loci for loci in genotypes if loci[ref_loc1_k1] == ref_loc1_v1]
+                       #and loci[ref_loc1_k2] == ref_loc1_v2]
+                       #and loci[ref_loc2_k1] == ref_loc2_v1]
+                       #and loci[ref_loc2_k2] == ref_loc2_v2]
+
+    if verbose:
+        print('genotype_subset_len: ', len(genotype_subset))
+        for idx, genotype in enumerate(genotype_subset):
+            if idx == 15:
+                break
+            print('subset genotypes: ', genotype)
+
+    #genotype_subset.sort(key=operator.itemgetter('freq'), reverse=True)
+
+    # print('after sort: ', genotype_subset)
+    # if verbose:
+    #     for idx, genotype in enumerate(genotype_subset):
+    #         if idx == 15:
+    #             break
+    #         print('after sort: ', genotype)
+
+    frequencies = [genotype['freq'] for genotype in genotype_subset]
+    if verbose:
+        for idx, frequency in enumerate(frequencies):
+            if idx == 15:
+                break
+            print('subset frequencies: ', frequency)
+
+    genotypes_random = random.choices(genotype_subset, frequencies, k=k_genotypes)
+
+    if verbose:
+        print(genotypes_random)
+
+    return genotypes_random
+
+
+def genotype_to_person_data(genotype):
+
+    id = genotype["id"]
+
+    loc_a = {'A1': genotype["A1"], 'A2': genotype["A2"]}
+    loc_b = {'B1': genotype["B1"], 'B2': genotype["B2"]}
+    loc_c = {'C1': genotype["C1"], 'C2': genotype["C2"]}
+    loc_drb = {'DRB11': genotype["DRB11"], 'DRB12': genotype["DRB12"]}
+    loc_dqb = {'DQB11': genotype["DQB11"], 'DQB12': genotype["DQB12"]}
+
+    hla = {'A': loc_a, 'B': loc_b, 'C': loc_c, 'DRB1': loc_drb, 'DQB1': loc_dqb}
+
+    print('fake_gl_string_input:', hla)
+
+    gl_string = build_gl_string(hla)
+
+    if not args.population:
+        population = 'NMDP EUR haplotypes (2007)'
+    else:
+        population = args.population
+
+    person_data = {'id': id, 'population': population, 'hla': hla, 'glString': gl_string}
+
+    return person_data
 
 def check_unsupported_loci(raw_tx_data):
     if raw_tx_data["pDRB31"] or raw_tx_data["pDRB32"] \
@@ -148,6 +270,7 @@ def cleanHLA(locus, allele):
 
 def build_genotypes():
 
+    # TODO handle g groups
     # read files
     spacer = '-'*40
     if verbose:
@@ -191,6 +314,7 @@ def build_genotypes():
     haplotypes.sort(key=lambda x: x['freq'], reverse=True)
 
     genotypes = []
+    frequencies = []
     genotypes_count = 0
     threshold = float(args.threshold)
     cumulated_left = 0.
@@ -206,9 +330,10 @@ def build_genotypes():
             cumulated_right += right['freq']
             if cumulated_left < threshold and cumulated_right < threshold and left['id'] != right['id']:
                 #writer.writerow([str(left['id']) + "-" + str(right['id']), left['A'], right['A'], left['B'], right['B'], left['C'], right['C'], left['DRB1'], right['DRB1'], left['DQB1'], right['DQB1'], left['freq'] * right['freq']])
-                genotype = {'id': str(left['id']) + "-" + str(right['id']), 'A1': left['A'], 'A2': right['A'], 'B1': left['B'], 'B2': right['B'], 'C1': left['C'], 'C2': right['C'], 'DRB11': left['DRB1'], 'DRB12': right['DRB1'], 'DQB12': left['DQB1'], 'DQB12': right['DQB1'], 'freq': left['freq'] * right['freq']}
+                genotype = {'id': str(left['id']) + "-" + str(right['id']), 'A1': left['A'], 'A2': right['A'], 'B1': left['B'], 'B2': right['B'], 'C1': left['C'], 'C2': right['C'], 'DRB11': left['DRB1'], 'DRB12': right['DRB1'], 'DQB11': left['DQB1'], 'DQB12': right['DQB1'], 'freq': left['freq'] * right['freq']}
                 genotypes.append(genotype)
                 genotypes_count += 1
+                frequencies.append(left['freq'] * right['freq'])
 
     if verbose:
         print(spacer)
@@ -216,6 +341,20 @@ def build_genotypes():
         print(spacer)
         print("successfully stored genotypes in file")
         print(spacer)
+
+    #frequencies.sort(key=operator.itemgetter('freq'), reverse=True)
+    genotypes.sort(key=operator.itemgetter('freq'), reverse=True)
+
+    # gt_count = 0
+    # for gt in genotypes:
+    #     print(gt)
+    #     gt_count += 1
+    #     if gt_count == 150:
+    #         break
+
+    genotype_data = {'genotypes': genotypes, 'frequencies': frequencies}
+
+    return genotype_data
 
 
 def write_results(match_results):
@@ -246,6 +385,7 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--threshold", help="frequency threshold for haplotypes 0.0 to 1.0", required=True)
     parser.add_argument("-ps", "--population_short", help="population short code as used in the header row", required=True)
     parser.add_argument("-o", "--output", help="output file name", required=True)
+    parser.add_argument("-a", "--anonymization", help="Enable anonymization. Default - False - no anonymization", default=False)
 
     args = parser.parse_args()
 
@@ -253,7 +393,10 @@ if __name__ == '__main__':
     if verbose:
         print("verbose mode active")
 
-    build_genotypes()
+    if args.anonymization:
+        genotype_data = build_genotypes()
+    else:
+        genotype_data = []
 
     raw_csv_data = {}
 
@@ -283,7 +426,7 @@ if __name__ == '__main__':
         else:
             print("CSV file provided does not match expected format.")
 
-    api_requests_payload = get_api_requests_payload(raw_csv_data)
+    api_requests_payload = get_api_requests_payload(raw_csv_data, genotype_data)
 
     results = []
     for api_request_payload in api_requests_payload:
