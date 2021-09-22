@@ -482,4 +482,4 @@ if __name__ == '__main__':
             result_data = {'id': list(response_raw_p1.keys())[0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
             results.append(result_data)
 
-    # write_results(results)
+    write_results(results)
