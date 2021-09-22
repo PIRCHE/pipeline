@@ -137,31 +137,31 @@ def get_genotype_subset(hla_tx, genotypes, k_genotypes):
     for idx, item in enumerate(hlas_sel[0].items()):
         if idx == 0:
             ref_loc1_k1 = item[0]
-            ref_loc1_v1 = item[1]
+            ref_loc1_v1 = item[1].split('*')[1]
         elif idx == 1:
             ref_loc1_k2 = item[0]
-            ref_loc1_v2 = item[1]
+            ref_loc1_v2 = item[1].split('*')[1]
 
     for idx, item in enumerate(hlas_sel[1].items()):
         if idx == 0:
             ref_loc2_k1 = item[0]
-            ref_loc2_v1 = item[1]
+            ref_loc2_v1 = item[1].split('*')[1]
         elif idx == 1:
             ref_loc2_k2 = item[0]
-            ref_loc2_v2 = item[1]
+            ref_loc2_v2 = item[1].split('*')[1]
 
     if verbose:
         print('refloc1_key1: ' + ref_loc1_k1 + ' -- refloc1_value1: ' + ref_loc1_v1)
-        #print('refloc1_key2: ' + ref_loc1_k2 + ' -- refloc1_value2: ' + ref_loc1_v2)
-        #print('refloc2_key1: ' + ref_loc2_k1 + ' -- refloc2_value1: ' + ref_loc2_v1)
-        #print('refloc2_key2: ' + ref_loc2_k2 + ' -- refloc2_value2: ' + ref_loc2_v2)
+        # print('refloc1_key2: ' + ref_loc1_k2 + ' -- refloc1_value2: ' + ref_loc1_v2)
+        # print('refloc2_key1: ' + ref_loc2_k1 + ' -- refloc2_value1: ' + ref_loc2_v1)
+        # print('refloc2_key2: ' + ref_loc2_k2 + ' -- refloc2_value2: ' + ref_loc2_v2)
 
         print('genotype_len: ', len(genotypes))
 
-    genotype_subset = [loci for loci in genotypes if loci[ref_loc1_k1] == ref_loc1_v1]
-                       #and loci[ref_loc1_k2] == ref_loc1_v2]
-                       #and loci[ref_loc2_k1] == ref_loc2_v1]
-                       #and loci[ref_loc2_k2] == ref_loc2_v2]
+    genotype_subset = [genotype for genotype in genotypes if ref_loc1_v1 in genotype[ref_loc1_k1]]
+                       # and ref_loc1_v2 in genotype[ref_loc1_k2]
+                       # and ref_loc2_v1 in genotype[ref_loc2_k1]]
+                       # and ref_loc2_v2 in genotype[ref_loc2_k2]
 
     if verbose:
         print('genotype_subset_len: ', len(genotype_subset))
@@ -198,11 +198,11 @@ def genotype_to_person_data(genotype):
 
     id = genotype["id"]
 
-    loc_a = {'A1': genotype["A1"], 'A2': genotype["A2"]}
-    loc_b = {'B1': genotype["B1"], 'B2': genotype["B2"]}
-    loc_c = {'C1': genotype["C1"], 'C2': genotype["C2"]}
-    loc_drb = {'DRB11': genotype["DRB11"], 'DRB12': genotype["DRB12"]}
-    loc_dqb = {'DQB11': genotype["DQB11"], 'DQB12': genotype["DQB12"]}
+    loc_a = {'A1': next(iter(genotype["A1"])), 'A2': next(iter(genotype["A2"]))}
+    loc_b = {'B1': next(iter(genotype["B1"])), 'B2': next(iter(genotype["B2"]))}
+    loc_c = {'C1': next(iter(genotype["C1"])), 'C2': next(iter(genotype["C2"]))}
+    loc_drb = {'DRB11': next(iter(genotype["DRB11"])), 'DRB12': next(iter(genotype["DRB12"]))}
+    loc_dqb = {'DQB11': next(iter(genotype["DQB11"])), 'DQB12': next(iter(genotype["DQB12"]))}
 
     hla = {'A': loc_a, 'B': loc_b, 'C': loc_c, 'DRB1': loc_drb, 'DQB1': loc_dqb}
 
@@ -215,7 +215,7 @@ def genotype_to_person_data(genotype):
     else:
         population = args.population
 
-    person_data = {'id': id, 'population': population, 'hla': hla, 'glString': gl_string}
+    person_data = {'id': id, 'population': population, 'glString': gl_string}
 
     return person_data
 
@@ -239,16 +239,25 @@ def check_unsupported_loci(raw_tx_data):
 def build_gl_string(hla):
 
     gl_string = ""
-    for locus in hla.values():
+    for locus, locus_full in hla.items():
         allele_count = 0
-        for allele in locus.values():
+        print('locus_full:', locus_full)
+        for allele in locus_full.values():
             allele_count += 1
             if allele_count == 1:
                 if allele:
-                    gl_string += allele + "+"
+                    if "*" in allele:
+                        gl_string += allele + "+"
+                    else:
+                        gl_string += locus + "*" + allele + "+"
+                    print('gl_string_build:', gl_string)
             else:
                 if allele:
-                    gl_string += allele + "^"
+                    if "*" in allele:
+                        gl_string += allele + "^"
+                    else:
+                        gl_string += locus + "*" + allele + "^"
+                    print('gl_string_build:', gl_string)
 
     # remove trailing element
     gl_string = gl_string[:-1]
@@ -256,21 +265,27 @@ def build_gl_string(hla):
     return gl_string
 
 
-def cleanHLA(locus, allele):
-    allele = allele.replace("g", "")
-    if "*" in allele:
-        allele = allele[allele.index("*") + 1:]
-    if ":" not in allele:
-        if len(allele) > 3:
-            allele = allele[0:2] + ":" + allele[2:4]
-        else:
-            print("ERROR: cannot clean " + locus + " " + allele)
-    return locus + "*" + allele.replace("g", "")
+def clean_hla(locus, allele, g_groups):
+    alleles = set()
+    if "g" in allele:
+        # alleles = g_groups.get(locus+allele)  # 2005 file format
+        alleles = g_groups.get(allele)  # 2011 file format
+    else:
+        if "*" in allele:
+            allele = allele[allele.index("*") + 1:]
+        if ":" not in allele:
+            if len(allele) > 3:
+                allele = allele[0:2] + ":" + allele[2:4]
+            else:
+                print("ERROR: cannot clean " + locus + " " + allele)
+        alleles.add(allele)
+    return alleles
 
 
 def build_genotypes():
 
-    # TODO handle g groups
+    g_groups = build_g_groups()
+
     # read files
     spacer = '-'*40
     if verbose:
@@ -298,11 +313,11 @@ def build_genotypes():
         if worksheet.cell(row_idx, col_idx[args.population_short + rank_suffix]).value != "NA":
             haplotype = {
                 'id': row_idx,
-                'A':  cleanHLA("A", worksheet.cell(row_idx, col_idx["A"]).value),
-                'B':  cleanHLA("B", worksheet.cell(row_idx, col_idx["B"]).value),
-                'C':  cleanHLA("C", worksheet.cell(row_idx, col_idx["C"]).value),
-                'DRB1':  cleanHLA("DRB1", worksheet.cell(row_idx, col_idx["DRB1"]).value),
-                'DQB1':  cleanHLA("DQB1", worksheet.cell(row_idx, col_idx["DQB1"]).value),
+                'A':  clean_hla("A", worksheet.cell(row_idx, col_idx["A"]).value, g_groups),
+                'B':  clean_hla("B", worksheet.cell(row_idx, col_idx["B"]).value, g_groups),
+                'C':  clean_hla("C", worksheet.cell(row_idx, col_idx["C"]).value, g_groups),
+                'DRB1':  clean_hla("DRB1", worksheet.cell(row_idx, col_idx["DRB1"]).value, g_groups),
+                'DQB1':  clean_hla("DQB1", worksheet.cell(row_idx, col_idx["DQB1"]).value, g_groups),
                 'freq':  float(worksheet.cell(row_idx, col_idx[args.population_short + freq_suffix]).value),
             }
             haplotypes.append(haplotype)
@@ -318,18 +333,18 @@ def build_genotypes():
     genotypes_count = 0
     threshold = float(args.threshold)
     cumulated_left = 0.
-    #with open(args.output, "w") as output:
-        #writer = csv.writer(output, delimiter=',')
-        #writer.writerow(["genotype", "A1", "A2", "B1", "B2", "C1", "C2", "DRB11", "DRB12", "DQB11", "DQB12", "freq"])
+    # with open(args.output, "w") as output:
+        # writer = csv.writer(output, delimiter=',')
+        # writer.writerow(["genotype", "A1", "A2", "B1", "B2", "C1", "C2", "DRB11", "DRB12", "DQB11", "DQB12", "freq"])
     for left in haplotypes:
         cumulated_left += left['freq']
-        #if cumulated_left < threshold and verbose:
-            #print("Remaining frequency " + "{:.5f}".format(threshold - cumulated_left))
+        # if cumulated_left < threshold and verbose:
+            # print("Remaining frequency " + "{:.5f}".format(threshold - cumulated_left))
         cumulated_right = 0.
         for right in haplotypes:
             cumulated_right += right['freq']
             if cumulated_left < threshold and cumulated_right < threshold and left['id'] != right['id']:
-                #writer.writerow([str(left['id']) + "-" + str(right['id']), left['A'], right['A'], left['B'], right['B'], left['C'], right['C'], left['DRB1'], right['DRB1'], left['DQB1'], right['DQB1'], left['freq'] * right['freq']])
+                # writer.writerow([str(left['id']) + "-" + str(right['id']), left['A'], right['A'], left['B'], right['B'], left['C'], right['C'], left['DRB1'], right['DRB1'], left['DQB1'], right['DQB1'], left['freq'] * right['freq']])
                 genotype = {'id': str(left['id']) + "-" + str(right['id']), 'A1': left['A'], 'A2': right['A'], 'B1': left['B'], 'B2': right['B'], 'C1': left['C'], 'C2': right['C'], 'DRB11': left['DRB1'], 'DRB12': right['DRB1'], 'DQB11': left['DQB1'], 'DQB12': right['DQB1'], 'freq': left['freq'] * right['freq']}
                 genotypes.append(genotype)
                 genotypes_count += 1
@@ -342,19 +357,47 @@ def build_genotypes():
         print("successfully stored genotypes in file")
         print(spacer)
 
-    #frequencies.sort(key=operator.itemgetter('freq'), reverse=True)
+    # frequencies.sort(key=operator.itemgetter('freq'), reverse=True)
     genotypes.sort(key=operator.itemgetter('freq'), reverse=True)
 
-    # gt_count = 0
-    # for gt in genotypes:
-    #     print(gt)
-    #     gt_count += 1
-    #     if gt_count == 150:
-    #         break
+    gt_count = 0
+    for gt in genotypes:
+        print(gt)
+        gt_count += 1
+        if gt_count == 150:
+            break
 
     genotype_data = {'genotypes': genotypes, 'frequencies': frequencies}
 
     return genotype_data
+
+
+def build_g_groups():
+    g_groups = {}
+    with open(args.ggroups) as f:
+        for line in f:
+            line_strip = line.rstrip()
+            line_values = line_strip.split(';')
+            if len(line_values) > 2 and line_values[2] != '':
+                group_alleles = clean_g_group_alleles(line_values[1])
+                # group_name = "".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2005 haplo file format
+                # locus = line_values[0].replace('*', '')  # 2005 haplo file format
+                group_name = ":".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2011 haplo file format
+                locus = line_values[0]  # 2011 haplo file format
+                g_groups[locus + group_name] = group_alleles
+                print('locus:', locus, ' -- group_alleles:', group_alleles, ' -- group_name:', group_name)
+    return g_groups
+
+
+def clean_g_group_alleles(g_group_alleles):
+    group_alleles = set()
+    alleles = g_group_alleles.split('/')
+    for allele in alleles:
+        if 'N' not in allele and 'Q' not in allele:
+            clean_allele = ":".join(allele.split(":", 2)[:2])
+            if clean_allele not in group_alleles:
+                group_alleles.add(clean_allele)
+    return group_alleles
 
 
 def write_results(match_results):
@@ -381,6 +424,7 @@ if __name__ == '__main__':
     parser.add_argument("-k", "--apikey", help="api key", type=str)
     parser.add_argument("-i", "--input", help="typing data input", type=str, required=True)
     parser.add_argument("-pp", "--population", help="population", type=str)
+    parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table", required=True)
     parser.add_argument("-hp", "--haplotypes", help="NMDP haplotype table (either 2007 or 2011 or equally formatted)", required=True)
     parser.add_argument("-t", "--threshold", help="frequency threshold for haplotypes 0.0 to 1.0", required=True)
     parser.add_argument("-ps", "--population_short", help="population short code as used in the header row", required=True)
@@ -434,7 +478,8 @@ if __name__ == '__main__':
         response_raw = response.json()
         response_raw_p1 = response_raw["pircheI"]
         response_raw_p2 = response_raw["pircheII"]
-        result_data = {'id': list(response_raw_p1.keys())[0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
-        results.append(result_data)
+        if len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
+            result_data = {'id': list(response_raw_p1.keys())[0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
+            results.append(result_data)
 
-    write_results(results)
+    # write_results(results)
