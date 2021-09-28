@@ -5,6 +5,7 @@ import json
 import xlrd
 import random
 import operator
+import hashlib
 
 
 def rest_request(url, username, password, api_key, api_req_payload):
@@ -107,13 +108,13 @@ def get_fk_data(tx_data, genotype_data):
     fk_data = []
     num_fk_genotypes = 5
 
-    p_hla_tx = tx_data['patient']['hla']
-    d_hla_tx = tx_data['donor']['hla']
+    p_glString_tx = tx_data['patient']['glString']
+    d_glString_tx = tx_data['donor']['glString']
 
     genotypes = genotype_data['genotypes']
 
-    p_genotypes = get_genotype_subset(p_hla_tx, genotypes, num_fk_genotypes)
-    d_genotypes = get_genotype_subset(d_hla_tx, genotypes, num_fk_genotypes)
+    p_genotypes = get_genotype_subset(p_glString_tx, genotypes, num_fk_genotypes)
+    d_genotypes = get_genotype_subset(d_glString_tx, genotypes, num_fk_genotypes)
 
     for idx in range(num_fk_genotypes):
         api_don_data = []
@@ -126,67 +127,22 @@ def get_fk_data(tx_data, genotype_data):
 
 def get_genotype_subset(hla_tx, genotypes, k_genotypes):
 
-    hlas = []
+    salt = args.salt
+    salted_input = hla_tx + salt
 
-    for loci in hla_tx.values():
-        # TODO handle/ignore empty loci/allele value
-        hlas.append(loci)
+    md5_hex = hashlib.md5(salted_input.encode()).hexdigest()
+    md5_str = str(md5_hex)
 
-    hlas_sel = random.sample(hlas, 2)
+    frequencies = [genotype['freq'] for genotype in genotypes]
 
-    for idx, item in enumerate(hlas_sel[0].items()):
-        if idx == 0:
-            ref_loc1_k1 = item[0]
-            ref_loc1_v1 = item[1].split('*')[1]
-        elif idx == 1:
-            ref_loc1_k2 = item[0]
-            ref_loc1_v2 = item[1].split('*')[1]
-
-    for idx, item in enumerate(hlas_sel[1].items()):
-        if idx == 0:
-            ref_loc2_k1 = item[0]
-            ref_loc2_v1 = item[1].split('*')[1]
-        elif idx == 1:
-            ref_loc2_k2 = item[0]
-            ref_loc2_v2 = item[1].split('*')[1]
-
-    if verbose:
-        print('refloc1_key1: ' + ref_loc1_k1 + ' -- refloc1_value1: ' + ref_loc1_v1)
-        # print('refloc1_key2: ' + ref_loc1_k2 + ' -- refloc1_value2: ' + ref_loc1_v2)
-        # print('refloc2_key1: ' + ref_loc2_k1 + ' -- refloc2_value1: ' + ref_loc2_v1)
-        # print('refloc2_key2: ' + ref_loc2_k2 + ' -- refloc2_value2: ' + ref_loc2_v2)
-
-        print('genotype_len: ', len(genotypes))
-
-    genotype_subset = [genotype for genotype in genotypes if ref_loc1_v1 in genotype[ref_loc1_k1]]
-                       # and ref_loc1_v2 in genotype[ref_loc1_k2]
-                       # and ref_loc2_v1 in genotype[ref_loc2_k1]]
-                       # and ref_loc2_v2 in genotype[ref_loc2_k2]
-
-    if verbose:
-        print('genotype_subset_len: ', len(genotype_subset))
-        for idx, genotype in enumerate(genotype_subset):
-            if idx == 15:
-                break
-            print('subset genotypes: ', genotype)
-
-    #genotype_subset.sort(key=operator.itemgetter('freq'), reverse=True)
-
-    # print('after sort: ', genotype_subset)
     # if verbose:
-    #     for idx, genotype in enumerate(genotype_subset):
+    #     for idx, frequency in enumerate(frequencies):
     #         if idx == 15:
     #             break
-    #         print('after sort: ', genotype)
+    #         print('frequencies: ', frequency)
 
-    frequencies = [genotype['freq'] for genotype in genotype_subset]
-    if verbose:
-        for idx, frequency in enumerate(frequencies):
-            if idx == 15:
-                break
-            print('subset frequencies: ', frequency)
-
-    genotypes_random = random.choices(genotype_subset, frequencies, k=k_genotypes)
+    random.seed(md5_str)
+    genotypes_random = random.choices(genotypes, frequencies, k=k_genotypes)
 
     if verbose:
         print(genotypes_random)
@@ -241,7 +197,7 @@ def build_gl_string(hla):
     gl_string = ""
     for locus, locus_full in hla.items():
         allele_count = 0
-        print('locus_full:', locus_full)
+        # print('locus_full:', locus_full)
         for allele in locus_full.values():
             allele_count += 1
             if allele_count == 1:
@@ -250,14 +206,14 @@ def build_gl_string(hla):
                         gl_string += allele + "+"
                     else:
                         gl_string += locus + "*" + allele + "+"
-                    print('gl_string_build:', gl_string)
+                    # print('gl_string_build:', gl_string)
             else:
                 if allele:
                     if "*" in allele:
                         gl_string += allele + "^"
                     else:
                         gl_string += locus + "*" + allele + "^"
-                    print('gl_string_build:', gl_string)
+                    # print('gl_string_build:', gl_string)
 
     # remove trailing element
     gl_string = gl_string[:-1]
@@ -266,9 +222,9 @@ def build_gl_string(hla):
 
 
 def clean_hla(locus, allele, g_groups):
-    alleles = set()
+    alleles = []
     if "g" in allele:
-        # alleles = g_groups.get(locus+allele)  # 2005 file format
+        # alleles_unordered = g_groups.get(locus+allele)  # 2005 file format
         alleles = g_groups.get(allele)  # 2011 file format
     else:
         if "*" in allele:
@@ -278,7 +234,7 @@ def clean_hla(locus, allele, g_groups):
                 allele = allele[0:2] + ":" + allele[2:4]
             else:
                 print("ERROR: cannot clean " + locus + " " + allele)
-        alleles.add(allele)
+        alleles.append(allele)
     return alleles
 
 
@@ -360,12 +316,12 @@ def build_genotypes():
     # frequencies.sort(key=operator.itemgetter('freq'), reverse=True)
     genotypes.sort(key=operator.itemgetter('freq'), reverse=True)
 
-    gt_count = 0
-    for gt in genotypes:
-        print(gt)
-        gt_count += 1
-        if gt_count == 150:
-            break
+    # gt_count = 0
+    # for gt in genotypes:
+    #     print(gt)
+    #     gt_count += 1
+    #     if gt_count == 150:
+    #         break
 
     genotype_data = {'genotypes': genotypes, 'frequencies': frequencies}
 
@@ -379,13 +335,15 @@ def build_g_groups():
             line_strip = line.rstrip()
             line_values = line_strip.split(';')
             if len(line_values) > 2 and line_values[2] != '':
-                group_alleles = clean_g_group_alleles(line_values[1])
+                group_alleles_unsort = clean_g_group_alleles(line_values[1])
+                group_alleles_sort = list(group_alleles_unsort)
+                group_alleles_sort.sort()
                 # group_name = "".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2005 haplo file format
                 # locus = line_values[0].replace('*', '')  # 2005 haplo file format
                 group_name = ":".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2011 haplo file format
                 locus = line_values[0]  # 2011 haplo file format
-                g_groups[locus + group_name] = group_alleles
-                print('locus:', locus, ' -- group_alleles:', group_alleles, ' -- group_name:', group_name)
+                g_groups[locus + group_name] = group_alleles_sort
+                print('locus:', locus, ' -- group_alleles:', group_alleles_sort, ' -- group_name:', group_name)
     return g_groups
 
 
@@ -430,6 +388,7 @@ if __name__ == '__main__':
     parser.add_argument("-ps", "--population_short", help="population short code as used in the header row", required=True)
     parser.add_argument("-o", "--output", help="output file name", required=True)
     parser.add_argument("-a", "--anonymization", help="Enable anonymization. Default - False - no anonymization", default=False)
+    parser.add_argument("-s", "--salt", help="Salt used to anonymize input data.")
 
     args = parser.parse_args()
 
