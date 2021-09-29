@@ -106,7 +106,7 @@ def get_tx_data(raw_tx_data):
 def get_fk_data(tx_data, genotype_data):
 
     fk_data = []
-    num_fk_genotypes = 5
+    num_fk_genotypes = int(args.kanonymization)
 
     p_glString_tx = tx_data['patient']['glString']
     d_glString_tx = tx_data['donor']['glString']
@@ -388,7 +388,8 @@ if __name__ == '__main__':
     parser.add_argument("-ps", "--population_short", help="population short code as used in the header row", required=True)
     parser.add_argument("-o", "--output", help="output file name", required=True)
     parser.add_argument("-a", "--anonymization", help="Enable anonymization. Default - False - no anonymization", default=False)
-    parser.add_argument("-s", "--salt", help="Salt used to anonymize input data.")
+    parser.add_argument("-s", "--salt", help="Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times.")
+    parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 5.", default=5)
 
     args = parser.parse_args()
 
