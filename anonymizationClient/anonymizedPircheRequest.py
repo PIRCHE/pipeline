@@ -7,6 +7,11 @@ import random
 import operator
 import hashlib
 
+# TODO
+# mark real data -> only write those to results
+# remove id from all entries -> possible to identify real data
+# low resolution support
+
 
 def rest_request(url, username, password, api_key, api_req_payload):
 
@@ -113,8 +118,8 @@ def get_fk_data(tx_data, genotype_data):
 
     genotypes = genotype_data['genotypes']
 
-    p_genotypes = get_genotype_subset(p_glString_tx, genotypes, num_fk_genotypes)
-    d_genotypes = get_genotype_subset(d_glString_tx, genotypes, num_fk_genotypes)
+    p_genotypes = get_fk_genotypes(p_glString_tx, genotypes, num_fk_genotypes)
+    d_genotypes = get_fk_genotypes(d_glString_tx, genotypes, num_fk_genotypes)
 
     for idx in range(num_fk_genotypes):
         api_don_data = []
@@ -125,7 +130,15 @@ def get_fk_data(tx_data, genotype_data):
     return fk_data
 
 
-def get_genotype_subset(hla_tx, genotypes, k_genotypes):
+def get_fk_genotypes(hla_tx, genotypes, k_genotypes):
+
+    genotypes_random = []
+
+    k_gen_real = k_genotypes // 2
+    k_gen_fk = k_gen_real
+    remainder = k_genotypes % 2
+    if remainder != 0:
+        k_gen_real += remainder
 
     salt = args.salt
     salted_input = hla_tx + salt
@@ -142,12 +155,34 @@ def get_genotype_subset(hla_tx, genotypes, k_genotypes):
     #         print('frequencies: ', frequency)
 
     random.seed(md5_str)
-    genotypes_random = random.choices(genotypes, frequencies, k=k_genotypes)
+    genotypes_real = random.choices(genotypes, frequencies, k=k_gen_real)
+    genotypes_random.extend(genotypes_real)
+
+    genotypes_fk = build_fake_genotypes(genotypes, frequencies, k_gen_fk)
+    genotypes_random.extend(genotypes_fk)
 
     if verbose:
         print(genotypes_random)
 
     return genotypes_random
+
+
+def build_fake_genotypes(genotypes, frequencies, k_gen_fk):
+
+    fk_genotypes = []
+    genotypes_fk_rnd = random.choices(genotypes, frequencies, k=k_gen_fk*5)
+
+    for i in range(k_gen_fk):
+        gen_fk = {'id': str(genotypes_fk_rnd[i]["id"]),
+                  'A1': genotypes_fk_rnd[i]["A1"], 'A2': genotypes_fk_rnd[i]["A2"],
+                  'B1': genotypes_fk_rnd[i*2]["B1"], 'B2': genotypes_fk_rnd[i*2]["B2"],
+                  'C1': genotypes_fk_rnd[i*3]["C1"], 'C2': genotypes_fk_rnd[i*3]["C2"],
+                  'DRB11': genotypes_fk_rnd[i*4]["DRB11"], 'DRB12': genotypes_fk_rnd[i*4]["DRB12"],
+                  'DQB11': genotypes_fk_rnd[i*5]["DQB11"], 'DQB12': genotypes_fk_rnd[i*5]["DQB12"],
+                  'freq': genotypes_fk_rnd[i]["freq"]}
+        fk_genotypes.append(gen_fk)
+
+    return fk_genotypes
 
 
 def genotype_to_person_data(genotype):
@@ -162,7 +197,8 @@ def genotype_to_person_data(genotype):
 
     hla = {'A': loc_a, 'B': loc_b, 'C': loc_c, 'DRB1': loc_drb, 'DQB1': loc_dqb}
 
-    print('fake_gl_string_input:', hla)
+    if verbose:
+        print('fake_gl_string_input:', hla)
 
     gl_string = build_gl_string(hla)
 
@@ -285,26 +321,18 @@ def build_genotypes():
     haplotypes.sort(key=lambda x: x['freq'], reverse=True)
 
     genotypes = []
-    frequencies = []
     genotypes_count = 0
     threshold = float(args.threshold)
     cumulated_left = 0.
-    # with open(args.output, "w") as output:
-        # writer = csv.writer(output, delimiter=',')
-        # writer.writerow(["genotype", "A1", "A2", "B1", "B2", "C1", "C2", "DRB11", "DRB12", "DQB11", "DQB12", "freq"])
     for left in haplotypes:
         cumulated_left += left['freq']
-        # if cumulated_left < threshold and verbose:
-            # print("Remaining frequency " + "{:.5f}".format(threshold - cumulated_left))
         cumulated_right = 0.
         for right in haplotypes:
             cumulated_right += right['freq']
             if cumulated_left < threshold and cumulated_right < threshold and left['id'] != right['id']:
-                # writer.writerow([str(left['id']) + "-" + str(right['id']), left['A'], right['A'], left['B'], right['B'], left['C'], right['C'], left['DRB1'], right['DRB1'], left['DQB1'], right['DQB1'], left['freq'] * right['freq']])
                 genotype = {'id': str(left['id']) + "-" + str(right['id']), 'A1': left['A'], 'A2': right['A'], 'B1': left['B'], 'B2': right['B'], 'C1': left['C'], 'C2': right['C'], 'DRB11': left['DRB1'], 'DRB12': right['DRB1'], 'DQB11': left['DQB1'], 'DQB12': right['DQB1'], 'freq': left['freq'] * right['freq']}
                 genotypes.append(genotype)
                 genotypes_count += 1
-                frequencies.append(left['freq'] * right['freq'])
 
     if verbose:
         print(spacer)
@@ -313,17 +341,17 @@ def build_genotypes():
         print("successfully stored genotypes in file")
         print(spacer)
 
-    # frequencies.sort(key=operator.itemgetter('freq'), reverse=True)
     genotypes.sort(key=operator.itemgetter('freq'), reverse=True)
 
-    # gt_count = 0
-    # for gt in genotypes:
-    #     print(gt)
-    #     gt_count += 1
-    #     if gt_count == 150:
-    #         break
+    # if verbose:
+    #     gt_count = 0
+    #     for gt in genotypes:
+    #         print(gt)
+    #         gt_count += 1
+    #         if gt_count == 150:
+    #             break
 
-    genotype_data = {'genotypes': genotypes, 'frequencies': frequencies}
+    genotype_data = {'genotypes': genotypes}
 
     return genotype_data
 
