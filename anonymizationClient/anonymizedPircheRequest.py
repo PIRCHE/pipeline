@@ -6,10 +6,9 @@ import xlrd
 import random
 import operator
 import hashlib
+import uuid
 
 # TODO
-# mark real data -> only write those to results
-# remove id from all entries -> possible to identify real data
 # low resolution support
 
 
@@ -58,12 +57,13 @@ def get_api_requests_payload(raw_input_data, genotype_data):
 
     for content in raw_input_data.values():
         tx_data = get_tx_data(content)
-        patient_data = {'id': tx_data['patient']['id'], 'population': tx_data['patient']['population'], 'glString': tx_data['patient']['glString']}
-        api_donor_data.append(({'id': tx_data['donor']['id'], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['glString']}))
+        id_map = {'p_id': (tx_data['patient']['id'], str(uuid.uuid4())), 'd_id': (tx_data['donor']['id'], str(uuid.uuid4()))}
+        patient_data = {'id': id_map['p_id'][1], 'population': tx_data['patient']['population'], 'glString': tx_data['patient']['glString']}
+        api_donor_data.append(({'id': id_map['d_id'][1], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['glString']}))
         if args.anonymization:
             fk_data = get_fk_data(tx_data, genotype_data)
             api_requests.extend(fk_data)
-        api_request = {'patient': patient_data, 'donors': api_donor_data}
+        api_request = {'patient': patient_data, 'donors': api_donor_data, 'id_map': id_map}
         api_requests.append(api_request)
         api_donor_data = []
 
@@ -173,7 +173,7 @@ def build_fake_genotypes(genotypes, frequencies, k_gen_fk):
     genotypes_fk_rnd = random.choices(genotypes, frequencies, k=k_gen_fk*5)
 
     for i in range(k_gen_fk):
-        gen_fk = {'id': str(genotypes_fk_rnd[i]["id"]),
+        gen_fk = {'id': '',
                   'A1': genotypes_fk_rnd[i]["A1"], 'A2': genotypes_fk_rnd[i]["A2"],
                   'B1': genotypes_fk_rnd[i*2]["B1"], 'B2': genotypes_fk_rnd[i*2]["B2"],
                   'C1': genotypes_fk_rnd[i*3]["C1"], 'C2': genotypes_fk_rnd[i*3]["C2"],
@@ -187,7 +187,7 @@ def build_fake_genotypes(genotypes, frequencies, k_gen_fk):
 
 def genotype_to_person_data(genotype):
 
-    id = genotype["id"]
+    id = str(uuid.uuid4())
 
     loc_a = {'A1': next(iter(genotype["A1"])), 'A2': next(iter(genotype["A2"]))}
     loc_b = {'B1': next(iter(genotype["B1"])), 'B2': next(iter(genotype["B2"]))}
@@ -466,8 +466,11 @@ if __name__ == '__main__':
         response_raw = response.json()
         response_raw_p1 = response_raw["pircheI"]
         response_raw_p2 = response_raw["pircheII"]
-        if len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
-            result_data = {'id': list(response_raw_p1.keys())[0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
-            results.append(result_data)
+        if "id_map" in api_request_payload and len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
+            if list(response_raw_p1.keys())[0] == api_request_payload["id_map"]["d_id"][1]:
+                result_data = {'id': api_request_payload["id_map"]["d_id"][0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
+                results.append(result_data)
+            else:
+                print('ERROR: request(' + api_request_payload["id_map"]["d_id"][1] + ') and response (' + list(response_raw_p1.keys())[0] + ') ids do not match. Result for donor_ID (' + api_request_payload["id_map"]["d_id"][0] + ') skipped.')
 
     write_results(results)
