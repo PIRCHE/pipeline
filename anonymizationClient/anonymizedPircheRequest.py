@@ -50,10 +50,10 @@ def rest_request(url, username, password, api_key, api_req_payload):
     return r
 
 
-def get_api_requests_payload(raw_input_data, genotype_data):
+def get_api_requests_data(raw_input_data, genotype_data):
 
     api_donor_data = []
-    api_requests = []
+    api_requests_data = []
 
     for content in raw_input_data.values():
         tx_data = get_tx_data(content)
@@ -62,12 +62,16 @@ def get_api_requests_payload(raw_input_data, genotype_data):
         api_donor_data.append(({'id': id_map['d_id'][1], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['glString']}))
         if args.anonymization:
             fk_data = get_fk_data(tx_data, genotype_data)
-            api_requests.extend(fk_data)
-        api_request = {'patient': patient_data, 'donors': api_donor_data, 'id_map': id_map}
-        api_requests.append(api_request)
+            for fk_data_entry in fk_data:
+                api_request_data = {'api_payload': fk_data_entry}
+                api_requests_data.append(api_request_data)
+        api_request_payload = {'patient': patient_data, 'donors': api_donor_data}
+        api_request_data = {'api_payload': api_request_payload, 'id_map': id_map}
+        api_requests_data.append(api_request_data)
+        random.shuffle(api_requests_data)
         api_donor_data = []
 
-    return api_requests
+    return api_requests_data
 
 
 def get_tx_data(raw_tx_data):
@@ -458,19 +462,19 @@ if __name__ == '__main__':
         else:
             print("CSV file provided does not match expected format.")
 
-    api_requests_payload = get_api_requests_payload(raw_csv_data, genotype_data)
+    api_requests_data = get_api_requests_data(raw_csv_data, genotype_data)
 
     results = []
-    for api_request_payload in api_requests_payload:
-        response = rest_request(args.url, args.user, args.password, args.apikey, api_request_payload)
+    for api_request_data in api_requests_data:
+        response = rest_request(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"])
         response_raw = response.json()
         response_raw_p1 = response_raw["pircheI"]
         response_raw_p2 = response_raw["pircheII"]
-        if "id_map" in api_request_payload and len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
-            if list(response_raw_p1.keys())[0] == api_request_payload["id_map"]["d_id"][1]:
-                result_data = {'id': api_request_payload["id_map"]["d_id"][0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
+        if "id_map" in api_request_data and len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
+            if list(response_raw_p1.keys())[0] == api_request_data["id_map"]["d_id"][1]:
+                result_data = {'id': api_request_data["id_map"]["d_id"][0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
                 results.append(result_data)
             else:
-                print('ERROR: request(' + api_request_payload["id_map"]["d_id"][1] + ') and response (' + list(response_raw_p1.keys())[0] + ') ids do not match. Result for donor_ID (' + api_request_payload["id_map"]["d_id"][0] + ') skipped.')
+                print('ERROR: request(' + api_request_data["id_map"]["d_id"][1] + ') and response (' + list(response_raw_p1.keys())[0] + ') ids do not match. Result for donor_ID (' + api_request_data["id_map"]["d_id"][0] + ') skipped.')
 
     write_results(results)
