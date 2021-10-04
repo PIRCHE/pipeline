@@ -69,7 +69,6 @@ def get_api_requests_data(raw_input_data, genotype_data):
         api_request_data = {'api_payload': api_request_payload, 'id_map': id_map}
         api_requests_data.append(api_request_data)
         random.shuffle(api_requests_data)
-        print(api_requests_data)
         api_donor_data = []
 
     return api_requests_data
