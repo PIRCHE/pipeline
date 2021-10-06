@@ -7,6 +7,7 @@ import random
 import operator
 import hashlib
 import uuid
+import itertools
 
 # TODO
 # low resolution support
@@ -81,19 +82,19 @@ def get_tx_data(raw_tx_data):
     p_id = raw_tx_data["pid"]
     d_id = raw_tx_data["did"]
 
-    ploc_a = {'A1': raw_tx_data["pA1"], 'A2': raw_tx_data["pA2"]}
-    ploc_b = {'B1': raw_tx_data["pB1"], 'B2': raw_tx_data["pB2"]}
-    ploc_c = {'C1': raw_tx_data["pC1"], 'C2': raw_tx_data["pC2"]}
-    ploc_drb = {'DRB11': raw_tx_data["pDRB11"], 'DRB12': raw_tx_data["pDRB12"]}
-    ploc_dqb = {'DQB11': raw_tx_data["pDQB11"], 'DQB12': raw_tx_data["pDQB12"]}
+    ploc_a = {'A1': next(iter(clean_hla("A", raw_tx_data["pA1"]))), 'A2': next(iter(clean_hla("A", raw_tx_data["pA2"])))}
+    ploc_b = {'B1': next(iter(clean_hla("B", raw_tx_data["pB1"]))), 'B2': next(iter(clean_hla("B", raw_tx_data["pB2"])))}
+    ploc_c = {'C1': next(iter(clean_hla("C", raw_tx_data["pC1"]))), 'C2': next(iter(clean_hla("C", raw_tx_data["pC2"])))}
+    ploc_drb = {'DRB11': next(iter(clean_hla("DRB1", raw_tx_data["pDRB11"]))), 'DRB12': next(iter(clean_hla("DRB1", raw_tx_data["pDRB12"])))}
+    ploc_dqb = {'DQB11': next(iter(clean_hla("DQB1", raw_tx_data["pDQB11"]))), 'DQB12': next(iter(clean_hla("DQB1", raw_tx_data["pDQB12"])))}
 
     p_hla = {'A': ploc_a, 'B': ploc_b, 'C': ploc_c, 'DRB1': ploc_drb, 'DQB1': ploc_dqb}
 
-    dloc_a = {'A1': raw_tx_data["dA1"], 'A2': raw_tx_data["dA2"]}
-    dloc_b = {'B1': raw_tx_data["dB1"], 'B2': raw_tx_data["dB2"]}
-    dloc_c = {'C1': raw_tx_data["dC1"], 'C2': raw_tx_data["dC2"]}
-    dloc_drb = {'DRB11': raw_tx_data["dDRB11"], 'DRB12': raw_tx_data["dDRB12"]}
-    dloc_dqb = {'DQB11': raw_tx_data["dDQB11"], 'DQB12': raw_tx_data["dDQB12"]}
+    dloc_a = {'A1': next(iter(clean_hla("A", raw_tx_data["dA1"]))), 'A2': next(iter(clean_hla("A", raw_tx_data["dA2"])))}
+    dloc_b = {'B1': next(iter(clean_hla("B", raw_tx_data["dB1"]))), 'B2': next(iter(clean_hla("B", raw_tx_data["dB2"])))}
+    dloc_c = {'C1': next(iter(clean_hla("C", raw_tx_data["dC1"]))), 'C2': next(iter(clean_hla("C", raw_tx_data["dC2"])))}
+    dloc_drb = {'DRB11': next(iter(clean_hla("DRB1", raw_tx_data["dDRB11"]))), 'DRB12': next(iter(clean_hla("DRB1", raw_tx_data["dDRB12"])))}
+    dloc_dqb = {'DQB11': next(iter(clean_hla("DQB1", raw_tx_data["dDQB11"]))), 'DQB12': next(iter(clean_hla("DQB1", raw_tx_data["dDQB12"])))}
 
     d_hla = {'A': dloc_a, 'B': dloc_b, 'C': dloc_c, 'DRB1': dloc_drb, 'DQB1': dloc_dqb}
 
@@ -122,30 +123,32 @@ def get_fk_data(tx_data, genotype_data):
 
     genotypes = genotype_data['genotypes']
 
-    p_genotypes = get_fk_genotypes(p_glString_tx, genotypes, num_fk_genotypes)
-    d_genotypes = get_fk_genotypes(d_glString_tx, genotypes, num_fk_genotypes)
+    p_genotypes = convert_genotypes(get_fk_genotypes(p_glString_tx, genotypes, num_fk_genotypes, "pat"))
+    d_genotypes = convert_genotypes(get_fk_genotypes(d_glString_tx, genotypes, num_fk_genotypes, "don"))
 
-    for idx in range(num_fk_genotypes):
-        api_don_data = []
-        pat_data = genotype_to_person_data(p_genotypes[idx])
-        api_don_data.append(genotype_to_person_data(d_genotypes[idx]))
-        fk_data.append({'patient': pat_data, 'donors': api_don_data})
+    p_genotypes.append(tx_data['patient']['hla'])
+    d_genotypes.append(tx_data['donor']['hla'])
+    gt_matrix = itertools.product(p_genotypes, d_genotypes)
+
+    for gt in gt_matrix:
+        if gt[0] != tx_data['patient']['hla'] or gt[1] != tx_data['donor']['hla']:  # exclude real patient donor pair here
+            api_don_data = []
+            pat_data = genotype_to_person_data(gt[0])
+            api_don_data.append(genotype_to_person_data(gt[1]))
+            fk_data.append({'patient': pat_data, 'donors': api_don_data})
 
     return fk_data
 
 
-def get_fk_genotypes(hla_tx, genotypes, k_genotypes):
+def get_fk_genotypes(hla_tx, genotypes, k_genotypes, person_type):
 
     genotypes_random = []
 
-    k_gen_real = k_genotypes // 2
-    k_gen_fk = k_gen_real
-    remainder = k_genotypes % 2
-    if remainder != 0:
-        k_gen_real += remainder
+    k_gen_real = random.randrange(1, k_genotypes-1)
+    k_gen_fk = k_genotypes - k_gen_real
 
     salt = args.salt
-    salted_input = hla_tx + salt
+    salted_input = hla_tx + salt + person_type
 
     md5_hex = hashlib.md5(salted_input.encode()).hexdigest()
     md5_str = str(md5_hex)
@@ -189,31 +192,38 @@ def build_fake_genotypes(genotypes, frequencies, k_gen_fk):
     return fk_genotypes
 
 
+def convert_genotypes(genotypes):
+
+    genotypes_converted = []
+    for genotype in genotypes:
+        loc_a = {'A1': next(iter(genotype["A1"])), 'A2': next(iter(genotype["A2"]))}
+        loc_b = {'B1': next(iter(genotype["B1"])), 'B2': next(iter(genotype["B2"]))}
+        loc_c = {'C1': next(iter(genotype["C1"])), 'C2': next(iter(genotype["C2"]))}
+        loc_drb = {'DRB11': next(iter(genotype["DRB11"])), 'DRB12': next(iter(genotype["DRB12"]))}
+        loc_dqb = {'DQB11': next(iter(genotype["DQB11"])), 'DQB12': next(iter(genotype["DQB12"]))}
+        genotypes_converted.append({'A': loc_a, 'B': loc_b, 'C': loc_c, 'DRB1': loc_drb, 'DQB1': loc_dqb})
+
+    return genotypes_converted
+
+
 def genotype_to_person_data(genotype):
 
-    id = str(uuid.uuid4())
-
-    loc_a = {'A1': next(iter(genotype["A1"])), 'A2': next(iter(genotype["A2"]))}
-    loc_b = {'B1': next(iter(genotype["B1"])), 'B2': next(iter(genotype["B2"]))}
-    loc_c = {'C1': next(iter(genotype["C1"])), 'C2': next(iter(genotype["C2"]))}
-    loc_drb = {'DRB11': next(iter(genotype["DRB11"])), 'DRB12': next(iter(genotype["DRB12"]))}
-    loc_dqb = {'DQB11': next(iter(genotype["DQB11"])), 'DQB12': next(iter(genotype["DQB12"]))}
-
-    hla = {'A': loc_a, 'B': loc_b, 'C': loc_c, 'DRB1': loc_drb, 'DQB1': loc_dqb}
+    p_id = str(uuid.uuid4())
 
     if verbose:
-        print('fake_gl_string_input:', hla)
+        print('fake_gl_string_input:', genotype)
 
-    gl_string = build_gl_string(hla)
+    gl_string = build_gl_string(genotype)
 
     if not args.population:
         population = 'NMDP EUR haplotypes (2007)'
     else:
         population = args.population
 
-    person_data = {'id': id, 'population': population, 'glString': gl_string}
+    person_data = {'id': p_id, 'population': population, 'glString': gl_string}
 
     return person_data
+
 
 def check_unsupported_loci(raw_tx_data):
     if raw_tx_data["pDRB31"] or raw_tx_data["pDRB32"] \
@@ -261,10 +271,10 @@ def build_gl_string(hla):
     return gl_string
 
 
-def clean_hla(locus, allele, g_groups):
+def clean_hla(locus, allele):
     alleles = []
     if "g" in allele:
-        # alleles_unordered = g_groups.get(locus+allele)  # 2005 file format
+        # alleles = g_groups.get(locus+allele)  # 2005 file format
         alleles = g_groups.get(allele)  # 2011 file format
     else:
         if "*" in allele:
@@ -279,8 +289,6 @@ def clean_hla(locus, allele, g_groups):
 
 
 def build_genotypes():
-
-    g_groups = build_g_groups()
 
     # read files
     spacer = '-'*40
@@ -309,11 +317,11 @@ def build_genotypes():
         if worksheet.cell(row_idx, col_idx[args.population_short + rank_suffix]).value != "NA":
             haplotype = {
                 'id': row_idx,
-                'A':  clean_hla("A", worksheet.cell(row_idx, col_idx["A"]).value, g_groups),
-                'B':  clean_hla("B", worksheet.cell(row_idx, col_idx["B"]).value, g_groups),
-                'C':  clean_hla("C", worksheet.cell(row_idx, col_idx["C"]).value, g_groups),
-                'DRB1':  clean_hla("DRB1", worksheet.cell(row_idx, col_idx["DRB1"]).value, g_groups),
-                'DQB1':  clean_hla("DQB1", worksheet.cell(row_idx, col_idx["DQB1"]).value, g_groups),
+                'A':  clean_hla("A", worksheet.cell(row_idx, col_idx["A"]).value),
+                'B':  clean_hla("B", worksheet.cell(row_idx, col_idx["B"]).value),
+                'C':  clean_hla("C", worksheet.cell(row_idx, col_idx["C"]).value),
+                'DRB1':  clean_hla("DRB1", worksheet.cell(row_idx, col_idx["DRB1"]).value),
+                'DQB1':  clean_hla("DQB1", worksheet.cell(row_idx, col_idx["DQB1"]).value),
                 'freq':  float(worksheet.cell(row_idx, col_idx[args.population_short + freq_suffix]).value),
             }
             haplotypes.append(haplotype)
@@ -394,7 +402,7 @@ def write_results(match_results):
     with open(args.output, "w") as output:
         writer = csv.writer(output, delimiter=',')
         writer.writerow(["id", "p1_A", "p1_B", "p1_C", "p1_DRB1", "p1_DRB3", "p1_DRB4", "p1_DRB5", "p1_DPA1", "p1_DPB1", "p1_DQA1", "p1_DQB1", "p1_SUM"
-                            , "p2_A", "p2_B", "p2_C", "p2_DRB1", "p2_DRB3", "p2_DRB4", "p2_DRB5", "p2_DPA1", "p2_DPB1", "p2_DQA1", "p2_DQB1", "p2_SUM"])
+                             , "p2_A", "p2_B", "p2_C", "p2_DRB1", "p2_DRB3", "p2_DRB4", "p2_DRB5", "p2_DPA1", "p2_DPB1", "p2_DQA1", "p2_DQB1", "p2_SUM"])
 
         for match_result in match_results:
             p1_scores = match_result['pircheI_scores']
@@ -428,6 +436,8 @@ if __name__ == '__main__':
     verbose = args.verbose
     if verbose:
         print("verbose mode active")
+
+    g_groups = build_g_groups()
 
     if args.anonymization:
         genotype_data = build_genotypes()
