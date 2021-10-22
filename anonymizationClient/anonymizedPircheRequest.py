@@ -9,9 +9,6 @@ import hashlib
 import uuid
 import itertools
 
-# TODO
-# low resolution support
-
 
 def rest_request(url, username, password, api_key, api_req_payload):
 
@@ -82,19 +79,19 @@ def get_tx_data(raw_tx_data):
     p_id = raw_tx_data["pid"]
     d_id = raw_tx_data["did"]
 
-    ploc_a = {'A1': next(iter(clean_hla("A", raw_tx_data["pA1"]))), 'A2': next(iter(clean_hla("A", raw_tx_data["pA2"])))}
-    ploc_b = {'B1': next(iter(clean_hla("B", raw_tx_data["pB1"]))), 'B2': next(iter(clean_hla("B", raw_tx_data["pB2"])))}
-    ploc_c = {'C1': next(iter(clean_hla("C", raw_tx_data["pC1"]))), 'C2': next(iter(clean_hla("C", raw_tx_data["pC2"])))}
-    ploc_drb = {'DRB11': next(iter(clean_hla("DRB1", raw_tx_data["pDRB11"]))), 'DRB12': next(iter(clean_hla("DRB1", raw_tx_data["pDRB12"])))}
-    ploc_dqb = {'DQB11': next(iter(clean_hla("DQB1", raw_tx_data["pDQB11"]))), 'DQB12': next(iter(clean_hla("DQB1", raw_tx_data["pDQB12"])))}
+    ploc_a = {'alleles': {'A1': next(iter(clean_hla("A", raw_tx_data["pA1"]))), 'A2': next(iter(clean_hla("A", raw_tx_data["pA2"])))}, 'res': check_loc_res([raw_tx_data["pA1"], raw_tx_data["pA2"]])}
+    ploc_b = {'alleles': {'B1': next(iter(clean_hla("B", raw_tx_data["pB1"]))), 'B2': next(iter(clean_hla("B", raw_tx_data["pB2"])))}, 'res': check_loc_res([raw_tx_data["pB1"], raw_tx_data["pB2"]])}
+    ploc_c = {'alleles': {'C1': next(iter(clean_hla("C", raw_tx_data["pC1"]))), 'C2': next(iter(clean_hla("C", raw_tx_data["pC2"])))}, 'res': check_loc_res([raw_tx_data["pC1"], raw_tx_data["pC2"]])}
+    ploc_drb = {'alleles': {'DRB11': next(iter(clean_hla("DRB1", raw_tx_data["pDRB11"]))), 'DRB12': next(iter(clean_hla("DRB1", raw_tx_data["pDRB12"])))}, 'res': check_loc_res([raw_tx_data["pDRB11"], raw_tx_data["pDRB12"]])}
+    ploc_dqb = {'alleles': {'DQB11': next(iter(clean_hla("DQB1", raw_tx_data["pDQB11"]))), 'DQB12': next(iter(clean_hla("DQB1", raw_tx_data["pDQB12"])))}, 'res': check_loc_res([raw_tx_data["pDQB11"], raw_tx_data["pDQB12"]])}
 
     p_hla = {'A': ploc_a, 'B': ploc_b, 'C': ploc_c, 'DRB1': ploc_drb, 'DQB1': ploc_dqb}
 
-    dloc_a = {'A1': next(iter(clean_hla("A", raw_tx_data["dA1"]))), 'A2': next(iter(clean_hla("A", raw_tx_data["dA2"])))}
-    dloc_b = {'B1': next(iter(clean_hla("B", raw_tx_data["dB1"]))), 'B2': next(iter(clean_hla("B", raw_tx_data["dB2"])))}
-    dloc_c = {'C1': next(iter(clean_hla("C", raw_tx_data["dC1"]))), 'C2': next(iter(clean_hla("C", raw_tx_data["dC2"])))}
-    dloc_drb = {'DRB11': next(iter(clean_hla("DRB1", raw_tx_data["dDRB11"]))), 'DRB12': next(iter(clean_hla("DRB1", raw_tx_data["dDRB12"])))}
-    dloc_dqb = {'DQB11': next(iter(clean_hla("DQB1", raw_tx_data["dDQB11"]))), 'DQB12': next(iter(clean_hla("DQB1", raw_tx_data["dDQB12"])))}
+    dloc_a = {'alleles': {'A1': next(iter(clean_hla("A", raw_tx_data["dA1"]))), 'A2': next(iter(clean_hla("A", raw_tx_data["dA2"])))}, 'res': check_loc_res([raw_tx_data["dA1"], raw_tx_data["dA2"]])}
+    dloc_b = {'alleles': {'B1': next(iter(clean_hla("B", raw_tx_data["dB1"]))), 'B2': next(iter(clean_hla("B", raw_tx_data["dB2"])))}, 'res': check_loc_res([raw_tx_data["dB1"], raw_tx_data["dB2"]])}
+    dloc_c = {'alleles': {'C1': next(iter(clean_hla("C", raw_tx_data["dC1"]))), 'C2': next(iter(clean_hla("C", raw_tx_data["dC2"])))}, 'res': check_loc_res([raw_tx_data["dC1"], raw_tx_data["dC2"]])}
+    dloc_drb = {'alleles': {'DRB11': next(iter(clean_hla("DRB1", raw_tx_data["dDRB11"]))), 'DRB12': next(iter(clean_hla("DRB1", raw_tx_data["dDRB12"])))}, 'res': check_loc_res([raw_tx_data["dDRB11"], raw_tx_data["dDRB12"]])}
+    dloc_dqb = {'alleles': {'DQB11': next(iter(clean_hla("DQB1", raw_tx_data["dDQB11"]))), 'DQB12': next(iter(clean_hla("DQB1", raw_tx_data["dDQB12"])))}, 'res': check_loc_res([raw_tx_data["dDQB11"], raw_tx_data["dDQB12"]])}
 
     d_hla = {'A': dloc_a, 'B': dloc_b, 'C': dloc_c, 'DRB1': dloc_drb, 'DQB1': dloc_dqb}
 
@@ -125,6 +122,9 @@ def get_fk_data(tx_data, genotype_data):
 
     p_genotypes = convert_genotypes(get_fk_genotypes(p_glString_tx, genotypes, num_fk_genotypes, "pat"))
     d_genotypes = convert_genotypes(get_fk_genotypes(d_glString_tx, genotypes, num_fk_genotypes, "don"))
+
+    handle_low_res(tx_data['patient']['hla'], p_genotypes)
+    handle_low_res(tx_data['donor']['hla'], d_genotypes)
 
     p_genotypes.append(tx_data['patient']['hla'])
     d_genotypes.append(tx_data['donor']['hla'])
@@ -196,11 +196,11 @@ def convert_genotypes(genotypes):
 
     genotypes_converted = []
     for genotype in genotypes:
-        loc_a = {'A1': next(iter(genotype["A1"])), 'A2': next(iter(genotype["A2"]))}
-        loc_b = {'B1': next(iter(genotype["B1"])), 'B2': next(iter(genotype["B2"]))}
-        loc_c = {'C1': next(iter(genotype["C1"])), 'C2': next(iter(genotype["C2"]))}
-        loc_drb = {'DRB11': next(iter(genotype["DRB11"])), 'DRB12': next(iter(genotype["DRB12"]))}
-        loc_dqb = {'DQB11': next(iter(genotype["DQB11"])), 'DQB12': next(iter(genotype["DQB12"]))}
+        loc_a = {'alleles': {'A1': next(iter(genotype["A1"])), 'A2': next(iter(genotype["A2"]))}}
+        loc_b = {'alleles': {'B1': next(iter(genotype["B1"])), 'B2': next(iter(genotype["B2"]))}}
+        loc_c = {'alleles': {'C1': next(iter(genotype["C1"])), 'C2': next(iter(genotype["C2"]))}}
+        loc_drb = {'alleles': {'DRB11': next(iter(genotype["DRB11"])), 'DRB12': next(iter(genotype["DRB12"]))}}
+        loc_dqb = {'alleles': {'DQB11': next(iter(genotype["DQB11"])), 'DQB12': next(iter(genotype["DQB12"]))}}
         genotypes_converted.append({'A': loc_a, 'B': loc_b, 'C': loc_c, 'DRB1': loc_drb, 'DQB1': loc_dqb})
 
     return genotypes_converted
@@ -210,10 +210,13 @@ def genotype_to_person_data(genotype):
 
     p_id = str(uuid.uuid4())
 
-    if verbose:
-        print('fake_gl_string_input:', genotype)
+    if dev:
+        print('fake genotypes build gl_string input:', genotype)
 
     gl_string = build_gl_string(genotype)
+
+    if dev:
+        print('fake genotypes build gl_string result:', gl_string)
 
     if not args.population:
         population = 'NMDP EUR haplotypes (2007)'
@@ -248,7 +251,7 @@ def build_gl_string(hla):
     for locus, locus_full in hla.items():
         allele_count = 0
         # print('locus_full:', locus_full)
-        for allele in locus_full.values():
+        for allele in locus_full["alleles"].values():
             allele_count += 1
             if allele_count == 1:
                 if allele:
@@ -274,18 +277,78 @@ def build_gl_string(hla):
 def clean_hla(locus, allele):
     alleles = []
     if "g" in allele:
-        # alleles = g_groups.get(locus+allele)  # 2005 file format
-        alleles = g_groups.get(allele)  # 2011 file format
+        # alleles = g_groups_global.get(locus+allele)  # 2005 haplotype file format
+        alleles = g_groups_global.get(allele)  # 2011 haplotype file format
     else:
         if "*" in allele:
             allele = allele[allele.index("*") + 1:]
-        if ":" not in allele:
-            if len(allele) > 3:
-                allele = allele[0:2] + ":" + allele[2:4]
-            else:
-                print("ERROR: cannot clean " + locus + " " + allele)
+        loc_prefixes = ["A", "B", "C", "DRB", "DQ", "DP"]
+        if "*" not in allele:
+            pref_to_remove = {'A': '', 'B': '', 'C': '', 'DRB1': '', 'DRB3': '', 'DRB4': '', 'DRB5': '', 'DQA1': '', 'DQB1': '', 'DPA1': '', 'DPB1': ''}
+            if any(loc_prefix in allele for loc_prefix in loc_prefixes):
+                for key, value in pref_to_remove.items():
+                    allele = allele.replace(key, value)
+            # else: # for 2005 haplotype file format
+                # if ":" not in allele:
+                    # if len(allele) > 3:
+                    #     allele = allele[0:2] + ":" + allele[2:4]
+                    # else:
+                    #     print("ERROR: cannot clean " + locus + " " + allele)
         alleles.append(allele)
     return alleles
+
+
+def check_loc_res(allele_values):
+    loc_res = "mol_high"
+    alleles_not_empty = [allele for allele in allele_values if allele.strip()]
+    if any(":" not in allele for allele in alleles_not_empty):
+        if any("*" not in allele for allele in alleles_not_empty):
+            loc_res = 'ser'
+        else:
+            loc_res = 'mol_low'
+    return loc_res
+
+
+def handle_low_res(tx_hla_data, fk_genotypes):
+
+    low_res_locs = []
+    for loc, locus_data in tx_hla_data.items():
+        if "ser" in locus_data["res"] or "mol_low" in locus_data["res"]:
+            if dev:
+                print('handleLowRes - loc: ', loc)
+                print('handleLowRes - locus_data: ', locus_data)
+            low_res_locs.append({"loc": loc, "res": locus_data["res"]})
+    if dev:
+        print('length low_res_locs: ', len(low_res_locs))
+    if len(low_res_locs) > 0:
+        map_high_to_low_res(low_res_locs, fk_genotypes)
+
+
+def map_high_to_low_res(lres_locs, fk_gts):
+    for fk_gt in fk_gts:
+        for lres_loc in lres_locs:
+            fk_gt_loc = fk_gt[lres_loc["loc"]]
+            if dev:
+                print('fk_gt_loc', fk_gt_loc)
+                print('lres_loc', lres_loc)
+            if "ser" in lres_loc["res"]:
+                alleles_ser = {}
+                for allele_loc, allele_val in fk_gt_loc["alleles"].items():
+                    if dev:
+                        print('allele to map to ser', allele_val)
+                    alleles_ser[allele_loc] = dna_ser_table_global[str(lres_loc["loc"]) + allele_val]
+                fk_gt_loc["alleles"] = alleles_ser
+                if dev:
+                    print('ser mapped alleles', fk_gt_loc["alleles"])
+            elif "mol_low" in lres_loc["res"]:
+                alleles_mol_low = {}
+                for allele_loc, allele_val in fk_gt_loc["alleles"].items():
+                    if dev:
+                        print('allele to map to low', allele_val)
+                    alleles_mol_low[allele_loc] = (str(allele_val).split(":", 1)[0])
+                fk_gt_loc["alleles"] = alleles_mol_low
+                if dev:
+                    print('low mapped alleles', fk_gt_loc["alleles"])
 
 
 def build_genotypes():
@@ -305,8 +368,8 @@ def build_genotypes():
 
     col_idx = {}
     for idx, cell_obj in enumerate(header):
-        if verbose:
-            print(str(idx) + " -> " + cell_obj.value)
+        if dev:
+            print("haplo file header: " + str(idx) + " -> " + cell_obj.value)
         col_idx[cell_obj.value] = idx
     if verbose:
         print(spacer)
@@ -355,7 +418,7 @@ def build_genotypes():
 
     genotypes.sort(key=operator.itemgetter('freq'), reverse=True)
 
-    # if verbose:
+    # if dev:
     #     gt_count = 0
     #     for gt in genotypes:
     #         print(gt)
@@ -369,22 +432,40 @@ def build_genotypes():
 
 
 def build_g_groups():
-    g_groups = {}
+    g_grps = {}
     with open(args.ggroups) as f:
         for line in f:
-            line_strip = line.rstrip()
-            line_values = line_strip.split(';')
-            if len(line_values) > 2 and line_values[2] != '':
-                group_alleles_unsort = clean_g_group_alleles(line_values[1])
-                group_alleles_sort = list(group_alleles_unsort)
-                group_alleles_sort.sort()
-                # group_name = "".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2005 haplo file format
-                # locus = line_values[0].replace('*', '')  # 2005 haplo file format
-                group_name = ":".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2011 haplo file format
-                locus = line_values[0]  # 2011 haplo file format
-                g_groups[locus + group_name] = group_alleles_sort
-                print('locus:', locus, ' -- group_alleles:', group_alleles_sort, ' -- group_name:', group_name)
-    return g_groups
+            if not line.startswith("#"):
+                line_strip = line.rstrip()
+                line_values = line_strip.split(';')
+                if len(line_values) > 2 and line_values[2] != '':
+                    group_alleles_unsort = clean_g_group_alleles(line_values[1])
+                    group_alleles_sort = list(group_alleles_unsort)
+                    group_alleles_sort.sort()
+                    # group_name = "".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2005 haplo file format
+                    # locus = line_values[0].replace('*', '')  # 2005 haplo file format
+                    group_name = ":".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2011 haplo file format
+                    locus = line_values[0]  # 2011 haplo file format
+                    g_grps[locus + group_name] = group_alleles_sort
+                    if dev:
+                        print('g-groups --> locus:', locus, ' -- group_alleles:', group_alleles_sort, ' -- group_name:', group_name)
+    return g_grps
+
+
+def build_dna_ser_table():
+    dna_ser_tbl = {}
+    with open(args.dstable) as f:
+        for line in f:
+            if not line.startswith("#"):
+                line_strip = line.rstrip()
+                line_values = line_strip.split(';')
+                if line_values[2] != '' and line_values[2] != '?' and line_values[2] != '0':
+                    locus = line_values[0].replace('*', '')  # locus without star symbol
+                    allele = ":".join(line_values[1].split(":", 2)[:2])  # only 4 digit
+                    dna_ser_tbl[locus + allele] = line_values[2]  # use locus + allele as dict key
+                    if dev:
+                        print('dna-ser -->  locus:', locus, ' -- allele:', allele, ' -- serology:', line_values[2])
+    return dna_ser_tbl
 
 
 def clean_g_group_alleles(g_group_alleles):
@@ -416,6 +497,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-v", "--verbose", help="verbose operation", action="store_true")
+    parser.add_argument("-d", "--dev", help="dev mode", action="store_true")
     parser.add_argument("-url", "--url", help="target url", type=str, required=True)
     parser.add_argument("-u", "--user", help="username for request", type=str)
     parser.add_argument("-p", "--password", help="user password", type=str)
@@ -423,6 +505,7 @@ if __name__ == '__main__':
     parser.add_argument("-i", "--input", help="typing data input", type=str, required=True)
     parser.add_argument("-pp", "--population", help="population", type=str)
     parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table", required=True)
+    parser.add_argument("-ds", "--dstable", help="HLA dna ser reference table", required=True)
     parser.add_argument("-hp", "--haplotypes", help="NMDP haplotype table (either 2007 or 2011 or equally formatted)", required=True)
     parser.add_argument("-t", "--threshold", help="frequency threshold for haplotypes 0.0 to 1.0", required=True)
     parser.add_argument("-ps", "--population_short", help="population short code as used in the header row", required=True)
@@ -437,7 +520,12 @@ if __name__ == '__main__':
     if verbose:
         print("verbose mode active")
 
-    g_groups = build_g_groups()
+    dev = args.dev
+    if dev:
+        print("dev mode active")
+
+    g_groups_global = build_g_groups()
+    dna_ser_table_global = build_dna_ser_table()
 
     if args.anonymization:
         genotype_data = build_genotypes()
