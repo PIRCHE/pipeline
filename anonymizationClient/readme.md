@@ -10,9 +10,9 @@ __Important note: The current version is feature complete but still in testing. 
 2. HLA typing data stored in a csv file according to the structure [importTemplate.csv](importTemplate.csv)
 3. An account on the PIRCHE web service (https://www.pirche.com) with API access enabled and API access token configured
 4. The following files must be downloaded and present in the script execution folder/location:<br>
-4.1 IMGTHLA g-groups reference table - [Link](https://github.com/ANHIG/IMGTHLA/blob/Latest/wmda/hla_nom_g.txt)<br>
-4.2 IMGTHLA dna-ser reference table - [Link](https://github.com/ANHIG/IMGTHLA/blob/Latest/wmda/rel_dna_ser.txt)<br>
-4.3 NMDP haplotype table file - [Link](https://bioinformatics.bethematchclinical.org/WorkArea/DownloadAsset.aspx?id=6383v) --> must be renamed to <code>2007_haplotypes.xls</code> after download<br> 
+4.1 IMGTHLA g-groups reference table (rel_dna_ser.txt) - [Link](https://raw.githubusercontent.com/ANHIG/IMGTHLA/Latest/wmda/hla_nom_g.txt) (Right click on Link and select "Save Link As ..")<br>
+4.2 IMGTHLA dna-ser reference table (hla_nom_g.txt) - [Link](https://raw.githubusercontent.com/ANHIG/IMGTHLA/Latest/wmda/rel_dna_ser.txt) (Right click on Link and select "Save Link As ..")<br>
+4.3 NMDP haplotype table file - [Link](https://bioinformatics.bethematchclinical.org/WorkArea/DownloadAsset.aspx?id=6383) --> file must be renamed to <code>2007_haplotypes.xls</code> after download<br> 
 
 ## Running the script
 Just run the script locally and provide all parameters needed. The results will be stored in a file containing PIRCHE I and II scores separated for each loci as well as added up to one PIRCHE I and II score. 
