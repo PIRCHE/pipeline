@@ -218,10 +218,7 @@ def genotype_to_person_data(genotype):
     if dev:
         print('fake genotypes build gl_string result:', gl_string)
 
-    if not args.population:
-        population = 'NMDP EUR haplotypes (2007)'
-    else:
-        population = args.population
+    population = args.population
 
     person_data = {'id': p_id, 'population': population, 'glString': gl_string}
 
@@ -250,7 +247,6 @@ def build_gl_string(hla):
     gl_string = ""
     for locus, locus_full in hla.items():
         allele_count = 0
-        # print('locus_full:', locus_full)
         for allele in locus_full["alleles"].values():
             allele_count += 1
             if allele_count == 1:
@@ -259,14 +255,12 @@ def build_gl_string(hla):
                         gl_string += allele + "+"
                     else:
                         gl_string += locus + "*" + allele + "+"
-                    # print('gl_string_build:', gl_string)
             else:
                 if allele:
                     if "*" in allele:
                         gl_string += allele + "^"
                     else:
                         gl_string += locus + "*" + allele + "^"
-                    # print('gl_string_build:', gl_string)
 
     # remove trailing element
     gl_string = gl_string[:-1]
@@ -277,23 +271,26 @@ def build_gl_string(hla):
 def clean_hla(locus, allele):
     alleles = []
     if "g" in allele:
-        # alleles = g_groups_global.get(locus+allele)  # 2005 haplotype file format
-        alleles = g_groups_global.get(allele)  # 2011 haplotype file format
+        if "*" in allele:  # e.g. g-group values format in 2011 haplotype file
+            alleles = g_groups_global.get(allele)
+        if "*" not in allele:  # e.g. g-group values format in 2007 haplotype file
+            alleles = g_groups_global.get(locus+allele)
+        print('g-group alleles', alleles)
     else:
         if "*" in allele:
             allele = allele[allele.index("*") + 1:]
+
         loc_prefixes = ["A", "B", "C", "DRB", "DQ", "DP"]
         if "*" not in allele:
             pref_to_remove = {'A': '', 'B': '', 'C': '', 'DRB1': '', 'DRB3': '', 'DRB4': '', 'DRB5': '', 'DQA1': '', 'DQB1': '', 'DPA1': '', 'DPB1': ''}
             if any(loc_prefix in allele for loc_prefix in loc_prefixes):
                 for key, value in pref_to_remove.items():
                     allele = allele.replace(key, value)
-            # else: # for 2005 haplotype file format
-                # if ":" not in allele:
-                    # if len(allele) > 3:
-                    #     allele = allele[0:2] + ":" + allele[2:4]
-                    # else:
-                    #     print("ERROR: cannot clean " + locus + " " + allele)
+            else:
+                if ":" not in allele:  # no '*' and no ':' e.g. allele format in 2007 haplotype file
+                    if len(allele) > 3:
+                        allele = allele[0:2] + ":" + allele[2:4]
+
         alleles.append(allele)
     return alleles
 
@@ -377,7 +374,7 @@ def build_genotypes():
     haplotypes = []
 
     for row_idx in range(1, worksheet.nrows):
-        if worksheet.cell(row_idx, col_idx[args.population_short + rank_suffix]).value != "NA":
+        if worksheet.cell(row_idx, col_idx[args.haplofilepop + rank_suffix]).value != "NA":
             haplotype = {
                 'id': row_idx,
                 'A':  clean_hla("A", worksheet.cell(row_idx, col_idx["A"]).value),
@@ -385,7 +382,7 @@ def build_genotypes():
                 'C':  clean_hla("C", worksheet.cell(row_idx, col_idx["C"]).value),
                 'DRB1':  clean_hla("DRB1", worksheet.cell(row_idx, col_idx["DRB1"]).value),
                 'DQB1':  clean_hla("DQB1", worksheet.cell(row_idx, col_idx["DQB1"]).value),
-                'freq':  float(worksheet.cell(row_idx, col_idx[args.population_short + freq_suffix]).value),
+                'freq':  float(worksheet.cell(row_idx, col_idx[args.haplofilepop + freq_suffix]).value),
             }
             haplotypes.append(haplotype)
 
@@ -397,7 +394,7 @@ def build_genotypes():
 
     genotypes = []
     genotypes_count = 0
-    threshold = float(args.threshold)
+    threshold = float(args.haplothreshold)
     cumulated_left = 0.
     for left in haplotypes:
         cumulated_left += left['freq']
@@ -442,10 +439,12 @@ def build_g_groups():
                     group_alleles_unsort = clean_g_group_alleles(line_values[1])
                     group_alleles_sort = list(group_alleles_unsort)
                     group_alleles_sort.sort()
-                    # group_name = "".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2005 haplo file format
-                    # locus = line_values[0].replace('*', '')  # 2005 haplo file format
-                    group_name = ":".join(line_values[2].split(":", 2)[:2]) + 'g'  # 2011 haplo file format
-                    locus = line_values[0]  # 2011 haplo file format
+                    if args.haplofileformat == "XXXX":  # 2007 haplo file format
+                        group_name = "".join(line_values[2].split(":", 2)[:2]) + 'g'
+                        locus = line_values[0].replace('*', '')
+                    elif args.haplofileformat == "L*XX:XX":  # 2011 haplo file format
+                        group_name = ":".join(line_values[2].split(":", 2)[:2]) + 'g'
+                        locus = line_values[0]
                     g_grps[locus + group_name] = group_alleles_sort
                     if dev:
                         print('g-groups --> locus:', locus, ' -- group_alleles:', group_alleles_sort, ' -- group_name:', group_name)
@@ -503,16 +502,17 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--password", help="user password", type=str)
     parser.add_argument("-k", "--apikey", help="api key", type=str)
     parser.add_argument("-i", "--input", help="typing data input", type=str, required=True)
-    parser.add_argument("-pp", "--population", help="population", type=str)
-    parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table", required=True)
-    parser.add_argument("-ds", "--dstable", help="HLA dna ser reference table", required=True)
-    parser.add_argument("-hp", "--haplotypes", help="NMDP haplotype table (either 2007 or 2011 or equally formatted)", required=True)
-    parser.add_argument("-t", "--threshold", help="frequency threshold for haplotypes 0.0 to 1.0", required=True)
-    parser.add_argument("-ps", "--population_short", help="population short code as used in the header row", required=True)
     parser.add_argument("-o", "--output", help="output file name", required=True)
-    parser.add_argument("-a", "--anonymization", help="Enable anonymization. Default - False - no anonymization", default=False)
+    parser.add_argument("-a", "--anonymization", help="Enable anonymization. Default - True - anonymization enabled", default=True)
     parser.add_argument("-s", "--salt", help="Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times.")
     parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 5.", default=5)
+    parser.add_argument("-pp", "--population", help="Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).", type=str, default="NMDP EUR haplotypes (2007)")
+    parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table file name and path. Default - hla_nom_g.txt ", default="hla_nom_g.txt")
+    parser.add_argument("-ds", "--dstable", help="HLA dna ser reference table file and path. Default - rel_dna_ser.txt ", default="rel_dna_ser.txt")
+    parser.add_argument("-ht", "--haplotypes", help="NMDP haplotype table file (either 2007 or 2011 or equally formatted). Default - 2007_haplotypes.xls", default="2007_haplotypes.xls")
+    parser.add_argument("-hf", "--haplofileformat", help="NMDP haplotype table file alleles format (either alleles XXXX (2007) or locus + alleles L*XX:XX (2011)). Default - XXXX", default="XXXX")
+    parser.add_argument("-hp", "--haplofilepop", help="NMDP haplotype table file population short code as used in the header row (e.g. EUR [2007] or EURCAU [2011] ). Default - EUR", default="EUR")
+    parser.add_argument("-hth", "--haplothreshold", help="frequency threshold for haplotypes 0.0 to 1.0. Default - 0.8", default="0.8")
 
     args = parser.parse_args()
 
