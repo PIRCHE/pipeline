@@ -75,6 +75,7 @@ def get_api_requests_data(raw_input_data, genotype_data):
 def get_tx_data(raw_tx_data):
 
     check_unsupported_loci(raw_tx_data)
+    check_nmdp_codes(raw_tx_data)
 
     p_id = raw_tx_data["pid"]
     d_id = raw_tx_data["did"]
@@ -241,6 +242,22 @@ def check_unsupported_loci(raw_tx_data):
         print('INFO: Only the locus A, B, C, DRB1 and DQB1 are supported '
               'the hla data of other locus will be ignored.')
 
+def check_nmdp_codes(raw_tx_data):
+    if is_nmdp_code(raw_tx_data["pA1"]) or is_nmdp_code(raw_tx_data["pA2"]) \
+            or is_nmdp_code(raw_tx_data["pB1"]) or is_nmdp_code(raw_tx_data["pB2"]) \
+            or is_nmdp_code(raw_tx_data["pC1"]) or is_nmdp_code(raw_tx_data["pC2"]) \
+            or is_nmdp_code(raw_tx_data["pDRB11"]) or is_nmdp_code(raw_tx_data["pDRB12"]) \
+            or is_nmdp_code(raw_tx_data["pDQB11"]) or is_nmdp_code(raw_tx_data["pDQB12"]):
+        print('ERROR: HLA typings containing NMDP codes are not supported.')
+        exit()
+
+def is_nmdp_code(raw_tx_data_value):
+    is_nmdp = False
+    if ":" in raw_tx_data_value:
+        check_split = raw_tx_data_value.split(":", 1)
+        if check_split[1].isalpha():
+            is_nmdp = True
+    return is_nmdp
 
 def build_gl_string(hla):
 
