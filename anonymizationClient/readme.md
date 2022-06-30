@@ -38,6 +38,8 @@ Parameters:
 | -hf   | --haplofileformat | d        |NMDP haplotype table file alleles format (either alleles XXXX (2007) or locus + alleles L*XX:XX (2011)). Default - XXXX <sup>4</sup>        |
 | -hp   | --haplofilepop    | d        |NMDP haplotype table file population short code as used in the header row (e.g. EUR (2007) or EURCAU (2011)) . Default - EUR <sup>4</sup>   |
 | -hth  | --haplothreshold  | d        |Frequency threshold for haplotypes generation 0.0 to 1.0. Default - 0.8 <sup>4</sup>                                                        |
+| -prx  | --proxyhttp		| o        |HTTP proxy - full http proxy url (ip or dns) with protocol and port (http(s)://proxy:port)                                                  |
+| -prxs | --proxyhttps		| o        |HTTPS proxy - full https proxy url (ip or dns) with protocol and port (http(s)://proxy:port)                                                |
 
 <sup>1</sup> x - value must be given | o - value is optional | d - value has a default but can be overwritten<br>
 <sup>2</sup> only either of user & password or api key credentials are needed<br>

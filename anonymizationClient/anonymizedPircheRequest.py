@@ -10,7 +10,10 @@ import uuid
 import itertools
 
 
-def rest_request(url, username, password, api_key, api_req_payload):
+def rest_request(url, username, password, api_key, api_req_payload, proxies):
+
+    if dev:
+        print('proxies: ', proxies)
 
     if not username or not password:
         payload = {'grant_type': 'authorization_code', 'client_id': 'api-client', 'code': api_key}
@@ -20,7 +23,7 @@ def rest_request(url, username, password, api_key, api_req_payload):
     if verbose:
         print("auth_req_payload:", payload)
 
-    r = requests.post(url + "/portal/rest/oauth/token", params=payload)
+    r = requests.post(url + "/portal/rest/oauth/token", proxies=proxies, params=payload)
 
     if verbose:
         print('auth_url: ' + r.url)
@@ -530,6 +533,8 @@ if __name__ == '__main__':
     parser.add_argument("-hf", "--haplofileformat", help="NMDP haplotype table file alleles format (either alleles XXXX (2007) or locus + alleles L*XX:XX (2011)). Default - XXXX", default="XXXX")
     parser.add_argument("-hp", "--haplofilepop", help="NMDP haplotype table file population short code as used in the header row (e.g. EUR [2007] or EURCAU [2011] ). Default - EUR", default="EUR")
     parser.add_argument("-hth", "--haplothreshold", help="frequency threshold for haplotypes 0.0 to 1.0. Default - 0.8", default="0.8")
+    parser.add_argument("-prx", "--proxyhttp", help="HTTP proxy - full http proxy url (ip or dns) with protocol and port (http(s)://proxy:port)")
+    parser.add_argument("-prxs", "--proxyhttps", help="HTTPS proxy - full https proxy url (ip or dns) with protocol and port (http(s)://proxy:port)")
 
     args = parser.parse_args()
 
@@ -580,8 +585,14 @@ if __name__ == '__main__':
     api_requests_data = get_api_requests_data(raw_csv_data, genotype_data)
 
     results = []
+
+    proxies = {
+        "http": args.proxyhttp,
+        "https": args.proxyhttps
+    }
+
     for api_request_data in api_requests_data:
-        response = rest_request(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"])
+        response = rest_request(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"], proxies)
         response_raw = response.json()
         response_raw_p1 = response_raw["pircheI"]
         response_raw_p2 = response_raw["pircheII"]
