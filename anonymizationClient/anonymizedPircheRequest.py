@@ -191,8 +191,13 @@ def build_fake_genotypes(genotypes, frequencies, k_gen_fk):
                   'DRB11': genotypes_fk_rnd[i*4]["DRB11"], 'DRB12': genotypes_fk_rnd[i*4]["DRB12"],
                   'DQB11': genotypes_fk_rnd[i*5]["DQB11"], 'DQB12': genotypes_fk_rnd[i*5]["DQB12"],
                   'freq': genotypes_fk_rnd[i]["freq"]}
-        fk_genotypes.append(gen_fk)
 
+        if random.random() < 0.01:
+            locus = random.choice(list(rare_alleles.keys()))
+            allele = random.choice(list(rare_alleles[locus]))
+            key = locus + random.choice(["1", "2"])
+            gen_fk[key] = allele
+        fk_genotypes.append(gen_fk)
     return fk_genotypes
 
 
@@ -242,8 +247,8 @@ def check_unsupported_loci(raw_tx_data):
             or raw_tx_data["dDQA11"] or raw_tx_data["dDQA12"] \
             or raw_tx_data["dDPA11"] or raw_tx_data["dDPA12"] \
             or raw_tx_data["dDPB11"] or raw_tx_data["dDPB12"]:
-        print('INFO: Only the locus A, B, C, DRB1 and DQB1 are supported '
-              'the hla data of other locus will be ignored.')
+        print('INFO: Only the locus A, B, C, DRB1 and DQB1 are supported. '
+              'The hla data of other locus will be ignored.')
 
 def check_nmdp_codes(raw_tx_data):
     if is_nmdp_code(raw_tx_data["pA1"]) or is_nmdp_code(raw_tx_data["pA2"]) \
@@ -511,6 +516,38 @@ def write_results(match_results):
                             , p2_scores['A'], p2_scores['B'], p2_scores['C'], p2_scores['DRB1'], p2_scores['DRB3'], p2_scores['DRB4'], p2_scores['DRB5'], p2_scores['DPA1'], p2_scores['DPB1'], p2_scores['DQA1'], p2_scores['DQB1'], p2_scores['sum']])
 
 
+def read_allelelist(allelelist, genotypes):
+    frequent_alleles = {'A': set(), 'B': set(), 'C': set(), 'DRB1': set(), 'DQB1': set()}
+    for genotype in genotypes['genotypes']:
+        frequent_alleles["A"].update(genotype['A1'])
+        frequent_alleles["A"].update(genotype['A2'])
+        frequent_alleles["B"].update(genotype['B1'])
+        frequent_alleles["B"].update(genotype['B2'])
+        frequent_alleles["C"].update(genotype['C1'])
+        frequent_alleles["C"].update(genotype['C2'])
+        frequent_alleles["DRB1"].update(genotype['DRB11'])
+        frequent_alleles["DRB1"].update(genotype['DRB12'])
+        frequent_alleles["DQB1"].update(genotype['DQB11'])
+        frequent_alleles["DQB1"].update(genotype['DQB12'])
+
+    rare_alleles = {}
+    with open(allelelist, "r") as input:
+        for row in input:
+            if not row.startswith("#"):
+                cols = row.strip().split(",")
+                allele = cols[1]
+                if "*" in allele:
+                    locus = allele.split("*")[0]
+                    if locus in frequent_alleles and locus not in rare_alleles:
+                        rare_alleles[locus] = set()
+                    allele = allele.split("*")[1]
+                    if ":" in allele:
+                        allele = allele.split(":")[0] + ":" + allele.split(":")[1]
+                        if locus in frequent_alleles and allele not in frequent_alleles[locus]:
+                            rare_alleles[locus].add(allele)
+    return rare_alleles
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -528,7 +565,8 @@ if __name__ == '__main__':
     parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 5.", default=5)
     parser.add_argument("-pp", "--population", help="Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).", type=str, default="NMDP EUR haplotypes (2007)")
     parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table file name and path. Default - hla_nom_g.txt ", default="hla_nom_g.txt")
-    parser.add_argument("-ds", "--dstable", help="HLA dna ser reference table file and path. Default - rel_dna_ser.txt ", default="rel_dna_ser.txt")
+    parser.add_argument("-ds", "--dstable", help="HLA dna ser reference table file and path. Default - rel_dna_ser.txt", default="rel_dna_ser.txt")
+    parser.add_argument("-al", "--allelelist", help="HLA allelelist file. Default - Allelelist.txt", default="Allelelist.txt")
     parser.add_argument("-ht", "--haplotypes", help="NMDP haplotype table file (either 2007 or 2011 or equally formatted). Default - 2007_haplotypes.xls", default="2007_haplotypes.xls")
     parser.add_argument("-hf", "--haplofileformat", help="NMDP haplotype table file alleles format (either alleles XXXX (2007) or locus + alleles L*XX:XX (2011)). Default - XXXX", default="XXXX")
     parser.add_argument("-hp", "--haplofilepop", help="NMDP haplotype table file population short code as used in the header row (e.g. EUR [2007] or EURCAU [2011] ). Default - EUR", default="EUR")
@@ -548,11 +586,12 @@ if __name__ == '__main__':
 
     g_groups_global = build_g_groups()
     dna_ser_table_global = build_dna_ser_table()
-
     if args.anonymization:
         genotype_data = build_genotypes()
     else:
         genotype_data = []
+
+    rare_alleles = read_allelelist(args.allelelist, genotype_data)
 
     raw_csv_data = {}
 
