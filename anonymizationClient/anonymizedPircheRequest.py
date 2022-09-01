@@ -41,7 +41,7 @@ def rest_request(url, username, password, api_key, api_req_payload, proxies):
     if verbose:
         print("api_req_payload:", json.dumps(api_req_payload))
 
-    r = requests.post(url + "/pirche/rest/sot/api/match", headers=headers, json=api_req_payload)
+    r = requests.post(url + "/pirche/rest/sot/api/match", headers=headers, proxies=proxies, json=api_req_payload)
 
     if verbose:
         print('api_url: ' + r.url)
