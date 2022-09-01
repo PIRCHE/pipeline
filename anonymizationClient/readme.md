@@ -12,7 +12,8 @@ __Important note: The current version is feature complete but still in testing. 
 4. The following files must be downloaded and present in the script execution folder/location:<br>
 4.1 IMGTHLA g-groups reference table (rel_dna_ser.txt) - [Link](https://raw.githubusercontent.com/ANHIG/IMGTHLA/Latest/wmda/hla_nom_g.txt) (Right click on Link and select "Save Link As ..")<br>
 4.2 IMGTHLA dna-ser reference table (hla_nom_g.txt) - [Link](https://raw.githubusercontent.com/ANHIG/IMGTHLA/Latest/wmda/rel_dna_ser.txt) (Right click on Link and select "Save Link As ..")<br>
-4.3 NMDP haplotype table file - [Link](https://bioinformatics.bethematchclinical.org/WorkArea/DownloadAsset.aspx?id=6383) --> file must be renamed to <code>2007_haplotypes.xls</code> after download<br> 
+4.3 IMGTHLA hla alleles reference table (Allelelist.txt) - [Link](https://raw.githubusercontent.com/ANHIG/IMGTHLA/Latest/Allelelist.txt) (Right click on Link and select "Save Link As ..")<br>
+4.4 NMDP haplotype table file - [Link](https://bioinformatics.bethematchclinical.org/WorkArea/DownloadAsset.aspx?id=6383) --> file must be renamed to <code>2007_haplotypes.xls</code> after download<br> 
 
 ## Running the script
 Just run the script locally and provide all parameters needed. The results will be stored in a file containing PIRCHE I and II scores separated for each loci as well as added up to one PIRCHE I and II score. 
@@ -34,6 +35,7 @@ Parameters:
 | -pp   | --population      | d        |Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).                     |
 | -gg   | --ggroups         | d        |HLA g-groups reference table file name and path. Default - hla_nom_g.txt                                                                    |
 | -ds   | --dstable         | d        |HLA dna ser reference table file and path. Default - rel_dna_ser.txt                                                                        |
+| -al   | --allelelist      | d        |HLA alleles reference table file. Default - Allelelist.txt                                                                                  |
 | -ht   | --haplotypes      | d        |NMDP haplotype table file name and path (either 2007 or 2011 or equally formatted). Default - 2007_haplotypes.xls <sup>4</sup>              |
 | -hf   | --haplofileformat | d        |NMDP haplotype table file alleles format (either alleles XXXX (2007) or locus + alleles L*XX:XX (2011)). Default - XXXX <sup>4</sup>        |
 | -hp   | --haplofilepop    | d        |NMDP haplotype table file population short code as used in the header row (e.g. EUR (2007) or EURCAU (2011)) . Default - EUR <sup>4</sup>   |
