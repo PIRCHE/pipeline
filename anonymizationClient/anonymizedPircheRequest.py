@@ -632,14 +632,17 @@ if __name__ == '__main__':
 
     for api_request_data in api_requests_data:
         response = rest_request(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"], proxies)
-        response_raw = response.json()
-        response_raw_p1 = response_raw["pircheI"]
-        response_raw_p2 = response_raw["pircheII"]
-        if "id_map" in api_request_data and len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
-            if list(response_raw_p1.keys())[0] == api_request_data["id_map"]["d_id"][1]:
-                result_data = {'id': api_request_data["id_map"]["d_id"][0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
-                results.append(result_data)
-            else:
-                print('ERROR: request(' + api_request_data["id_map"]["d_id"][1] + ') and response (' + list(response_raw_p1.keys())[0] + ') ids do not match. Result for donor_ID (' + api_request_data["id_map"]["d_id"][0] + ') skipped.')
-
+        if response.status_code == 200:
+            response_raw = response.json()
+            response_raw_p1 = response_raw["pircheI"]
+            response_raw_p2 = response_raw["pircheII"]
+            if "id_map" in api_request_data and len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
+                if list(response_raw_p1.keys())[0] == api_request_data["id_map"]["d_id"][1]:
+                    result_data = {'id': api_request_data["id_map"]["d_id"][0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
+                    print(result_data)
+                    results.append(result_data)
+                else:
+                    print('ERROR: request(' + api_request_data["id_map"]["d_id"][1] + ') and response (' + list(response_raw_p1.keys())[0] + ') ids do not match. Result for donor_ID (' + api_request_data["id_map"]["d_id"][0] + ') skipped.')
+        else:
+            print('ERROR: a request failed')
     write_results(results)
