@@ -307,7 +307,8 @@ def clean_hla(locus, allele):
 
         loc_prefixes = ["A", "B", "C", "DRB", "DQ", "DP"]
         if "*" not in allele:
-            pref_to_remove = {'A': '', 'B': '', 'C': '', 'DRB1': '', 'DRB3': '', 'DRB4': '', 'DRB5': '', 'DQA1': '', 'DQB1': '', 'DPA1': '', 'DPB1': ''}
+            # order in list is important otherwise B will be removed from DRB before causing DR which is not removed afterwards
+            pref_to_remove = {'DRB1': '', 'DRB3': '', 'DRB4': '', 'DRB5': '', 'DQA1': '', 'DQB1': '', 'DPA1': '', 'DPB1': '', 'A': '', 'B': '', 'C': ''}
             if any(loc_prefix in allele for loc_prefix in loc_prefixes):
                 for key, value in pref_to_remove.items():
                     allele = allele.replace(key, value)
@@ -358,7 +359,12 @@ def map_high_to_low_res(lres_locs, fk_gts):
                 for allele_loc, allele_val in fk_gt_loc["alleles"].items():
                     if dev:
                         print('allele to map to ser', allele_val)
-                    alleles_ser[allele_loc] = dna_ser_table_global[str(lres_loc["loc"]) + allele_val]
+                    if str(lres_loc["loc"]) + allele_val in dna_ser_table_global.keys():
+                        alleles_ser[allele_loc] = dna_ser_table_global[str(lres_loc["loc"]) + allele_val]
+                    else: # fallback to molecular low if no serological equivalent could be found due to mapping backwards from high to low
+                        if dev:
+                            print('fallback used to map to ser no serological equivalent found for', str(lres_loc["loc"]) + allele_val)
+                        alleles_ser[allele_loc] = (str(allele_val).split(":", 1)[0])
                 fk_gt_loc["alleles"] = alleles_ser
                 if dev:
                     print('ser mapped alleles', fk_gt_loc["alleles"])
