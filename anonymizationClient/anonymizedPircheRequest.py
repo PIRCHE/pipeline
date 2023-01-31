@@ -568,7 +568,7 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--output", help="output file name", required=True)
     parser.add_argument("-a", "--anonymization", help="Enable anonymization. Default - True - anonymization enabled", default=True)
     parser.add_argument("-s", "--salt", help="Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times.")
-    parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 5.", default=5)
+    parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 3.", default=3)
     parser.add_argument("-pp", "--population", help="Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).", type=str, default="NMDP EUR haplotypes (2007)")
     parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table file name and path. Default - hla_nom_g.txt ", default="hla_nom_g.txt")
     parser.add_argument("-ds", "--dstable", help="HLA dna ser reference table file and path. Default - rel_dna_ser.txt", default="rel_dna_ser.txt")
