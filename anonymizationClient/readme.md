@@ -7,7 +7,13 @@ __Important note: The current version is feature complete but still in testing. 
 
 ## Requirements
 1. Working Python 3 environment with the modules needed by the script (see imports)
-2. HLA typing data stored in a csv file according to the structure [importTemplate.csv](importTemplate.csv)
+2. HLA typing data stored in a csv file according to the structure [importTemplate.csv](importTemplate.csv). So one line per patient donor pair. All values are separated by a comma and structured according to the header. Currently only the locus A, B, C, DRB1, DQB1 are supported due to limited haplotype data available for generating the "smoke/fake" data needed for anonymization. 
+   
+   The following HLA resolutions are supported:
+   1. molecular high resolution: C*05:01 (more than 4 digits can be provided BUT this is not considered when calculating the PIRCHE score)
+   2. molecular low resolution: C*05 (2 digits, with asterisk) 
+   3. serological equivalent (low resolution): C5 (so if it is a serological value you should provided it as such when using the anonymization client - without asterisk)
+
 3. An account on the PIRCHE web service (https://www.pirche.com) with API access enabled and API access token configured
 4. The following files must be downloaded and present in the script execution folder/location:<br>
 4.1 IMGTHLA g-groups reference table (rel_dna_ser.txt) - [Link](https://raw.githubusercontent.com/ANHIG/IMGTHLA/Latest/wmda/hla_nom_g.txt) (Right click on Link and select "Save Link As ..")<br>
