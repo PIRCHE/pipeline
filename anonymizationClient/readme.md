@@ -26,36 +26,39 @@ Just run the script locally and provide all parameters needed. The results will 
 
 Parameters:
 
-| Short | Long              |Needed<sup>1</sup>| Description                                                                                                                        |
-|:------|:-------------     |:------:  |:-----                                                                                                                                      |
-| -v    | --verbose         |          |Verbose mode                                                                                                                                |
-| -url  | --url             | x        |URL to the PIRCHE web service                                                                                                               |
-| -u    | --user            | o        |PIRCHE web service user <sup>2</sup>                                                                                                        |
-| -p    | --password        | o        |PIRCHE web service user password <sup>2</sup>                                                                                               |
-| -k    | --apikey          | o        |PIRCHE web service user API Key <sup>2</sup>                                                                                                |
-| -i    | --input           | x        |HLA typing data input file                                                                                                                  |
-| -o    | --output          | x        |Output file name                                                                                                                            |
-| -a    | --anonymization   | d        |Enable anonymization. Default - True - Anonymization enabled                                                                                |
-| -s    | --salt            | x        |Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times. <sup>3</sup>         |
-| -k    | --kanonymization  | d        |Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 5.                                                 |
-| -pp   | --population      | d        |Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).                     |
-| -gg   | --ggroups         | d        |HLA g-groups reference table file name and path. Default - hla_nom_g.txt                                                                    |
-| -ds   | --dstable         | d        |HLA dna ser reference table file and path. Default - rel_dna_ser.txt                                                                        |
-| -al   | --allelelist      | d        |HLA alleles reference table file. Default - Allelelist.txt                                                                                  |
-| -ht   | --haplotypes      | d        |NMDP haplotype table file name and path (either 2007 or 2011 or equally formatted). Default - 2007_haplotypes.xls <sup>4</sup>              |
-| -hf   | --haplofileformat | d        |NMDP haplotype table file alleles format (either alleles XXXX (2007) or locus + alleles L*XX:XX (2011)). Default - XXXX <sup>4</sup>        |
-| -hp   | --haplofilepop    | d        |NMDP haplotype table file population short code as used in the header row (e.g. EUR (2007) or EURCAU (2011)) . Default - EUR <sup>4</sup>   |
-| -hth  | --haplothreshold  | d        |Frequency threshold for haplotypes generation 0.0 to 1.0. Default - 0.8 <sup>4</sup>                                                        |
-| -prx  | --proxyhttp		| o        |HTTP proxy - full http proxy url (ip or dns) with protocol and port (http(s)://proxy:port)                                                  |
-| -prxs | --proxyhttps		| o        |HTTPS proxy - full https proxy url (ip or dns) with protocol and port (http(s)://proxy:port)                                                |
+| Short | Long              |Needed<sup>1</sup>| Description                                                                                                                               |
+|:------|:------------------|:------:  |:------------------------------------------------------------------------------------------------------------------------------------------|
+| -v    | --verbose         |          | Verbose mode                                                                                                                              |
+| -url  | --url             | x        | URL to the PIRCHE web service                                                                                                             |
+| -u    | --user            | o        | PIRCHE web service user <sup>2</sup>                                                                                                      |
+| -p    | --password        | o        | PIRCHE web service user password <sup>2</sup>                                                                                             |
+| -k    | --apikey          | o        | PIRCHE web service user API Key <sup>2</sup>                                                                                              |
+| -i    | --input           | x        | HLA typing data input file                                                                                                                |
+| -o    | --output          | x        | Output file name                                                                                                                          |
+| -a    | --anonymization   | d        | Enable anonymization. Default - True - Anonymization enabled                                                                              |
+| -s    | --salt            | x        | Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times. <sup>3</sup>       |
+| -k    | --kanonymization  | d        | Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 3. <sup>4</sup>                                  |
+| -rm   | --requestmode     | d        | Single (single) or multiple (multi) patient donor pairs per request. Default - multi.                                                     |
+| -rs   | --requestsize     | d        | Max number of patient donor pairs per request for multi request setting. Depends on the PIRCHE server setting.                            |
+| -pp   | --population      | d        | Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).                   |
+| -gg   | --ggroups         | d        | HLA g-groups reference table file name and path. Default - hla_nom_g.txt                                                                  |
+| -ds   | --dstable         | d        | HLA dna ser reference table file and path. Default - rel_dna_ser.txt                                                                      |
+| -al   | --allelelist      | d        | HLA alleles reference table file. Default - Allelelist.txt                                                                                |
+| -ht   | --haplotypes      | d        | NMDP haplotype table file name and path (either 2007 or 2011 or equally formatted). Default - 2007_haplotypes.xls <sup>5</sup>            |
+| -hf   | --haplofileformat | d        | NMDP haplotype table file alleles format (either alleles XXXX (2007) or locus + alleles L*XX:XX (2011)). Default - XXXX <sup>5</sup>      |
+| -hp   | --haplofilepop    | d        | NMDP haplotype table file population short code as used in the header row (e.g. EUR (2007) or EURCAU (2011)) . Default - EUR <sup>5</sup> |
+| -hth  | --haplothreshold  | d        | Frequency threshold for haplotypes generation 0.0 to 1.0. Default - 0.8 <sup>5</sup>                                                      |
+| -prx  | --proxyhttp       | o        | HTTP proxy - full http proxy url (ip or dns) with protocol and port (http(s)://proxy:port)                                                |
+| -prxs | --proxyhttps      | o        | HTTPS proxy - full https proxy url (ip or dns) with protocol and port (http(s)://proxy:port)                                              |
 
 <sup>1</sup> x - value must be given | o - value is optional | d - value has a default but can be overwritten<br>
 <sup>2</sup> only either of user & password or api key credentials are needed<br>
 <sup>3</sup> not required if anonymization is disabled<br>
-<sup>4</sup> if haplotype table file is changed format and population must be changed accordingly; threshold might be adjusted as well<br>
+<sup>4</sup> IMPORTANT: the number of patient donor pairs is heavily influenced by this value due to the generation of smoke pairs; txPairs = (k+1)<sup>2</sup> * realTxPairs (e.g. k=3 and 2 realTxPairs lead to 32 pairs to be calculated already)<br>
+<sup>5</sup> if haplotype table file is changed format and population must be changed accordingly; threshold might be adjusted as well<br>
 
-Example call (with anonymization enabled and using default haplotype table values):<br>
-`-v -url https://www.pirche.com -key apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass`
+Example call parameters (with anonymization enabled and using default haplotype table values):<br>
+`-url https://www.pirche.com -key apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass`
 
 Example call (with anonymization enabled and using custom haplotype table values):<br>
-`-v -url https://www.pirche.com -key apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass -ht 2011_haplotypes.xls -hf L*XX:XX -hp EURCAU -hth 0.7`
+`-url https://www.pirche.com -key apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass -ht 2011_haplotypes.xls -hf L*XX:XX -hp EURCAU -hth 0.7`
