@@ -39,7 +39,7 @@ Parameters:
 | -s    | --salt            | x        | Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times. <sup>3</sup>       |
 | -k    | --kanonymization  | d        | Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 3. <sup>4</sup>                                  |
 | -rm   | --requestmode     | d        | Single (single) or multiple (multi) patient donor pairs per request. Default - multi.                                                     |
-| -rs   | --requestsize     | d        | Max number of patient donor pairs per request for multi request setting. Depends on the PIRCHE server setting.                            |
+| -rs   | --requestsize     | d        | Max number of patient donor pairs per request for multi request setting. Max 500. Default - 300.                                          |
 | -pp   | --population      | d        | Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).                   |
 | -gg   | --ggroups         | d        | HLA g-groups reference table file name and path. Default - hla_nom_g.txt                                                                  |
 | -ds   | --dstable         | d        | HLA dna ser reference table file and path. Default - rel_dna_ser.txt                                                                      |
