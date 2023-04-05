@@ -12,6 +12,44 @@ import itertools
 
 def rest_request(url, username, password, api_key, api_req_payload, proxies):
 
+    headers = auth_request(url, username, password, api_key, proxies)
+
+    if verbose:
+        print("api_req_payload:", json.dumps(api_req_payload))
+
+    if args.requestmode == "multi":
+        r = requests.post(url + "/pirche/rest/sot/multipatientmatch", headers=headers, proxies=proxies, data=api_req_payload)
+    elif args.requestmode == "single":
+        r = requests.post(url + "/pirche/rest/sot/api/match", headers=headers, proxies=proxies, json=api_req_payload)
+
+    if verbose:
+        print('api_url: ' + r.url)
+        print('api_req_status: ', r.status_code)
+        print("api_req_response: ", r.text)
+
+    return r
+
+
+def request_population_id(url, username, password, api_key, proxies, p_name):
+
+    headers = auth_request(url, username, password, api_key, proxies)
+
+    pop_r = requests.get(url + "/pirche/rest/populations", headers=headers, proxies=proxies)
+
+    for population in pop_r.json():
+        if population["name"] == p_name:
+            p_id = population["id"]
+
+    if verbose:
+        print('api_url: ' + pop_r.url)
+        print('api_req_status: ', pop_r.status_code)
+        print("api_req_response: ", pop_r.text)
+
+    return p_id
+
+
+def auth_request(url, username, password, api_key, proxies):
+
     if dev:
         print('proxies: ', proxies)
 
@@ -23,57 +61,102 @@ def rest_request(url, username, password, api_key, api_req_payload, proxies):
     if verbose:
         print("auth_req_payload:", payload)
 
-    r = requests.post(url + "/portal/rest/oauth/token", proxies=proxies, params=payload)
+    auth_r = requests.post(url + "/portal/rest/oauth/token", proxies=proxies, params=payload)
 
     if verbose:
-        print('auth_url: ' + r.url)
-        print('auth_req_status: ', r.status_code)
-        print("auth_req_response: ", r.json())
+        print('auth_url: ' + auth_r.url)
+        print('auth_req_status: ', auth_r.status_code)
+        print("auth_req_response: ", auth_r.json())
 
-    response = r.json()
+    auth_response = auth_r.json()
 
     headers = {
-        "Authorization": "Bearer " + response['access_token'],
+        "Authorization": "Bearer " + auth_response['access_token'],
         "Content-type": "application/json;charset=utf-8",
         "Accept": "application/json"
     }
 
-    if verbose:
-        print("api_req_payload:", json.dumps(api_req_payload))
+    return headers
 
-    r = requests.post(url + "/pirche/rest/sot/api/match", headers=headers, proxies=proxies, json=api_req_payload)
+def get_api_request_data_multi(raw_input_data, genotype_data, proxies):
 
-    if verbose:
-        print('api_url: ' + r.url)
-        print('api_req_status: ', r.status_code)
-        print("api_req_response: ", r.text)
+    api_request_data = {}
+    api_payloads = []
+    id_list = {}
+    full_data = []
 
-    return r
+    count_datasets = 0
 
+    pop_id = request_population_id(args.url, args.user, args.password, args.apikey, proxies, args.population)
 
-def get_api_requests_data(raw_input_data, genotype_data):
+    header = "0.5,500,1000,0.01,0," + pop_id + ",false,false,false,false,false,false,2,2,2,2,2,150,true,true,false,0,0,false|"
+    body = ""
 
+    for content in raw_input_data.values():
+
+        tx_data = get_tx_data(content)
+        id_map = {'p_id': (tx_data['patient']['id'], str(uuid.uuid4())), 'd_id': (tx_data['donor']['id'], str(uuid.uuid4()))}
+        id_list[id_map['d_id'][1]] = id_map
+        patient_data_tx = {'id': id_map['p_id'][1], 'population': tx_data['patient']['population'], 'hlaString': tx_data['patient']['hlaString']}
+        donor_data_tx = {'id': id_map['d_id'][1], 'population': tx_data['donor']['population'], 'hlaString': tx_data['donor']['hlaString']}
+        tx_pair = {"patient": patient_data_tx, "donor": donor_data_tx}
+        full_data.append(tx_pair)
+
+        if args.anonymization:
+            fk_data = get_fk_data(tx_data, genotype_data)
+            full_data.extend(fk_data)
+
+    random.shuffle(full_data)
+
+    for data_entry in full_data:
+        body += data_entry["patient"]["id"] + "," + data_entry["patient"]["hlaString"] + "\n"
+        body += data_entry["donor"]["id"] + "," + data_entry["donor"]["hlaString"] + "\n"
+        body += "," + "\n"
+
+        count_datasets += 1
+
+        # if dev:
+        #     print('Count:', count_datasets)
+
+        if count_datasets == args.requestsize:
+            api_payload = header + body.rsplit("\n", 2)[0]
+            api_payloads.append(api_payload)
+            body = ""
+            count_datasets = 0
+
+    if count_datasets > 0:
+        api_payload = header + body.rsplit("\n", 2)[0]
+        api_payloads.append(api_payload)
+
+    api_request_data = {'api_payloads': api_payloads, 'id_list': id_list}
+
+    return api_request_data
+
+def get_api_requests_data_single(raw_input_data, genotype_data):
     api_donor_data = []
     api_requests_data = []
 
     for content in raw_input_data.values():
         tx_data = get_tx_data(content)
         id_map = {'p_id': (tx_data['patient']['id'], str(uuid.uuid4())), 'd_id': (tx_data['donor']['id'], str(uuid.uuid4()))}
-        patient_data = {'id': id_map['p_id'][1], 'population': tx_data['patient']['population'], 'glString': tx_data['patient']['glString']}
-        api_donor_data.append(({'id': id_map['d_id'][1], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['glString']}))
+        patient_data = {'id': id_map['p_id'][1], 'population': tx_data['patient']['population'], 'glString': tx_data['patient']['hlaString']}
+        api_donor_data.append(({'id': id_map['d_id'][1], 'population': tx_data['donor']['population'], 'glString': tx_data['donor']['hlaString']}))
         if args.anonymization:
             fk_data = get_fk_data(tx_data, genotype_data)
             for fk_data_entry in fk_data:
-                api_request_data = {'api_payload': fk_data_entry}
+                api_request_data = {'api_payload': fk_data_entry}  #create on multi csv request content object
                 api_requests_data.append(api_request_data)
         api_request_payload = {'patient': patient_data, 'donors': api_donor_data}
         api_request_data = {'api_payload': api_request_payload, 'id_map': id_map}
         api_requests_data.append(api_request_data)
-        random.shuffle(api_requests_data)
         api_donor_data = []
 
-    return api_requests_data
+    random.shuffle(api_requests_data)
 
+    if dev:
+        print('number datasets:', len(api_requests_data))
+
+    return api_requests_data
 
 def get_tx_data(raw_tx_data):
 
@@ -99,16 +182,20 @@ def get_tx_data(raw_tx_data):
 
     d_hla = {'A': dloc_a, 'B': dloc_b, 'C': dloc_c, 'DRB1': dloc_drb, 'DQB1': dloc_dqb}
 
-    p_gl_string = build_gl_string(p_hla)
-    d_gl_string = build_gl_string(d_hla)
+    if args.requestmode == "multi":
+        p_hla_string = build_csv_data(p_hla)
+        d_hla_string = build_csv_data(d_hla)
+    else:
+        p_hla_string = build_gl_string(p_hla)
+        d_hla_string = build_gl_string(d_hla)
 
     if not args.population:
         population = 'NMDP EUR haplotypes (2007)'
     else:
         population = args.population
 
-    pat_data = {'id': p_id, 'population': population, 'hla': p_hla, 'glString': p_gl_string}
-    don_data = {'id': d_id, 'population': population, 'hla': d_hla, 'glString': d_gl_string}
+    pat_data = {'id': p_id, 'population': population, 'hla': p_hla, 'hlaString': p_hla_string}
+    don_data = {'id': d_id, 'population': population, 'hla': d_hla, 'hlaString': d_hla_string}
     tx_data = {'patient': pat_data, 'donor': don_data}
 
     return tx_data
@@ -119,16 +206,16 @@ def get_fk_data(tx_data, genotype_data):
     fk_data = []
     num_fk_genotypes = int(args.kanonymization)
 
-    p_glString_tx = tx_data['patient']['glString']
-    d_glString_tx = tx_data['donor']['glString']
+    p_hlaString_tx = tx_data['patient']['hlaString']
+    d_hlaString_tx = tx_data['donor']['hlaString']
 
     genotypes = genotype_data['genotypes']
 
-    p_genotypes = convert_genotypes(get_fk_genotypes(p_glString_tx, genotypes, num_fk_genotypes, "pat"))
-    d_genotypes = convert_genotypes(get_fk_genotypes(d_glString_tx, genotypes, num_fk_genotypes, "don"))
+    p_genotypes = convert_genotypes(get_fk_genotypes(p_hlaString_tx, genotypes, num_fk_genotypes, "pat"))
+    d_genotypes = convert_genotypes(get_fk_genotypes(d_hlaString_tx, genotypes, num_fk_genotypes, "don"))
 
-    handle_low_res(tx_data['patient']['hla'], p_genotypes)
-    handle_low_res(tx_data['donor']['hla'], d_genotypes)
+    handle_res(tx_data['patient']['hla'], p_genotypes)
+    handle_res(tx_data['donor']['hla'], d_genotypes)
 
     p_genotypes.append(tx_data['patient']['hla'])
     d_genotypes.append(tx_data['donor']['hla'])
@@ -136,10 +223,18 @@ def get_fk_data(tx_data, genotype_data):
 
     for gt in gt_matrix:
         if gt[0] != tx_data['patient']['hla'] or gt[1] != tx_data['donor']['hla']:  # exclude real patient donor pair here
-            api_don_data = []
             pat_data = genotype_to_person_data(gt[0])
-            api_don_data.append(genotype_to_person_data(gt[1]))
-            fk_data.append({'patient': pat_data, 'donors': api_don_data})
+            if args.requestmode == "multi":
+                don_data = genotype_to_person_data(gt[1])
+                fk_data.append({'patient': pat_data, 'donor': don_data})
+            elif args.requestmode == "single":
+                don_data = [genotype_to_person_data(gt[1])]
+                fk_data.append({'patient': pat_data, 'donors': don_data})
+
+        else:
+            if dev:
+                print('real tx pair excluded pat: ', gt[0])
+                print('real tx pair excluded donor: ', gt[1])
 
     return fk_data
 
@@ -220,16 +315,24 @@ def genotype_to_person_data(genotype):
     p_id = str(uuid.uuid4())
 
     if dev:
-        print('fake genotypes build gl_string input:', genotype)
+        print('fake genotypes build data_string input:', genotype)
 
-    gl_string = build_gl_string(genotype)
+    hlaStringIdentifier = "hlaString"
+    if args.requestmode == "multi":
+        hla_string = build_csv_data(genotype)
+    elif args.requestmode == "single":
+        hla_string = build_gl_string(genotype)
+        hlaStringIdentifier = "glString"
 
     if dev:
-        print('fake genotypes build gl_string result:', gl_string)
+        print('fake genotypes build hlaString result:', hla_string)
 
-    population = args.population
+    if not args.population:
+        population = 'NMDP EUR haplotypes (2007)'
+    else:
+        population = args.population
 
-    person_data = {'id': p_id, 'population': population, 'glString': gl_string}
+    person_data = {'id': p_id, 'population': population, hlaStringIdentifier: hla_string}
 
     return person_data
 
@@ -292,6 +395,19 @@ def build_gl_string(hla):
 
     return gl_string
 
+def build_csv_data(hla):
+    csv_data = ""
+
+    for locus, locus_full in hla.items():
+        for allele in locus_full["alleles"].values():
+            if allele:
+                csv_data += locus + "*" + allele + ","
+
+    # remove trailing element
+    csv_data = csv_data[:-1]
+
+    return csv_data
+
 
 def clean_hla(locus, allele):
     alleles = []
@@ -300,14 +416,16 @@ def clean_hla(locus, allele):
             alleles = g_groups_global.get(allele)
         if "*" not in allele:  # e.g. g-group values format in 2007 haplotype file
             alleles = g_groups_global.get(locus+allele)
-        print('g-group alleles', alleles)
+        if dev:
+            print('g-group alleles', alleles)
     else:
         if "*" in allele:
             allele = allele[allele.index("*") + 1:]
 
         loc_prefixes = ["A", "B", "C", "DRB", "DQ", "DP"]
         if "*" not in allele:
-            pref_to_remove = {'A': '', 'B': '', 'C': '', 'DRB1': '', 'DRB3': '', 'DRB4': '', 'DRB5': '', 'DQA1': '', 'DQB1': '', 'DPA1': '', 'DPB1': ''}
+            # order in list is important otherwise B will be removed from DRB before causing DR which is not removed afterwards
+            pref_to_remove = {'DRB1': '', 'DRB3': '', 'DRB4': '', 'DRB5': '', 'DQA1': '', 'DQB1': '', 'DPA1': '', 'DPB1': '', 'A': '', 'B': '', 'C': ''}
             if any(loc_prefix in allele for loc_prefix in loc_prefixes):
                 for key, value in pref_to_remove.items():
                     allele = allele.replace(key, value)
@@ -331,38 +449,38 @@ def check_loc_res(allele_values):
     return loc_res
 
 
-def handle_low_res(tx_hla_data, fk_genotypes):
+def handle_res(tx_hla_data, fk_gts):
 
-    low_res_locs = []
+    locs_res = []
+
     for loc, locus_data in tx_hla_data.items():
-        if "ser" in locus_data["res"] or "mol_low" in locus_data["res"]:
-            if dev:
-                print('handleLowRes - loc: ', loc)
-                print('handleLowRes - locus_data: ', locus_data)
-            low_res_locs.append({"loc": loc, "res": locus_data["res"]})
-    if dev:
-        print('length low_res_locs: ', len(low_res_locs))
-    if len(low_res_locs) > 0:
-        map_high_to_low_res(low_res_locs, fk_genotypes)
+        locs_res.append({"loc": loc, "res": locus_data["res"]})
+        if dev:
+            print('handleRes - loc: ', loc)
+            print('handleRes - locus_data: ', locus_data)
 
-
-def map_high_to_low_res(lres_locs, fk_gts):
     for fk_gt in fk_gts:
-        for lres_loc in lres_locs:
-            fk_gt_loc = fk_gt[lres_loc["loc"]]
+        for loc_res in locs_res:
+            fk_gt_loc = fk_gt[loc_res["loc"]]
+            fk_gt_loc["res"] = loc_res["res"];
             if dev:
                 print('fk_gt_loc', fk_gt_loc)
-                print('lres_loc', lres_loc)
-            if "ser" in lres_loc["res"]:
+                print('loc_res', loc_res)
+            if "ser" in loc_res["res"]:
                 alleles_ser = {}
                 for allele_loc, allele_val in fk_gt_loc["alleles"].items():
                     if dev:
                         print('allele to map to ser', allele_val)
-                    alleles_ser[allele_loc] = dna_ser_table_global[str(lres_loc["loc"]) + allele_val]
+                    if str(loc_res["loc"]) + allele_val in dna_ser_table_global.keys():
+                        alleles_ser[allele_loc] = dna_ser_table_global[str(loc_res["loc"]) + allele_val]
+                    else: # fallback to molecular low if no serological equivalent could be found due to mapping backwards from high to low
+                        if dev:
+                            print('fallback used to map to ser no serological equivalent found for', str(loc_res["loc"]) + allele_val)
+                        alleles_ser[allele_loc] = (str(allele_val).split(":", 1)[0])
                 fk_gt_loc["alleles"] = alleles_ser
                 if dev:
                     print('ser mapped alleles', fk_gt_loc["alleles"])
-            elif "mol_low" in lres_loc["res"]:
+            elif "mol_low" in loc_res["res"]:
                 alleles_mol_low = {}
                 for allele_loc, allele_val in fk_gt_loc["alleles"].items():
                     if dev:
@@ -371,7 +489,6 @@ def map_high_to_low_res(lres_locs, fk_gts):
                 fk_gt_loc["alleles"] = alleles_mol_low
                 if dev:
                     print('low mapped alleles', fk_gt_loc["alleles"])
-
 
 def build_genotypes():
 
@@ -503,19 +620,6 @@ def clean_g_group_alleles(g_group_alleles):
     return group_alleles
 
 
-def write_results(match_results):
-    with open(args.output, "w") as output:
-        writer = csv.writer(output, delimiter=',')
-        writer.writerow(["id", "p1_A", "p1_B", "p1_C", "p1_DRB1", "p1_DRB3", "p1_DRB4", "p1_DRB5", "p1_DPA1", "p1_DPB1", "p1_DQA1", "p1_DQB1", "p1_SUM"
-                             , "p2_A", "p2_B", "p2_C", "p2_DRB1", "p2_DRB3", "p2_DRB4", "p2_DRB5", "p2_DPA1", "p2_DPB1", "p2_DQA1", "p2_DQB1", "p2_SUM"])
-
-        for match_result in match_results:
-            p1_scores = match_result['pircheI_scores']
-            p2_scores = match_result['pircheII_scores']
-            writer.writerow([str(match_result['id']), p1_scores['A'], p1_scores['B'], p1_scores['C'], p1_scores['DRB1'], p1_scores['DRB3'], p1_scores['DRB4'], p1_scores['DRB5'], p1_scores['DPA1'], p1_scores['DPB1'], p1_scores['DQA1'], p1_scores['DQB1'], p1_scores['sum']
-                            , p2_scores['A'], p2_scores['B'], p2_scores['C'], p2_scores['DRB1'], p2_scores['DRB3'], p2_scores['DRB4'], p2_scores['DRB5'], p2_scores['DPA1'], p2_scores['DPB1'], p2_scores['DQA1'], p2_scores['DQB1'], p2_scores['sum']])
-
-
 def read_allelelist(allelelist, genotypes):
     frequent_alleles = {'A': set(), 'B': set(), 'C': set(), 'DRB1': set(), 'DQB1': set()}
     for genotype in genotypes['genotypes']:
@@ -547,6 +651,86 @@ def read_allelelist(allelelist, genotypes):
                             rare_alleles[locus].add(allele)
     return rare_alleles
 
+def parse_response_single(response_json, api_request_data, results):
+    response_raw_p1 = response_json["pircheI"]
+    response_raw_p2 = response_json["pircheII"]
+    if "id_map" in api_request_data and len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
+        if list(response_raw_p1.keys())[0] == api_request_data["id_map"]["d_id"][1]:
+            result_data = {'id': api_request_data["id_map"]["d_id"][0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
+            if dev:
+                print(result_data)
+            results.append(result_data)
+        else:
+            print('ERROR: request(' + api_request_data["id_map"]["d_id"][1] + ') and response (' + list(response_raw_p1.keys())[0] + ') ids do not match. Result for donor_ID (' + api_request_data["id_map"]["d_id"][0] + ') skipped.')
+
+def write_results_single(match_results):
+    with open(args.output, "w") as output:
+        writer = csv.writer(output, delimiter=',')
+        writer.writerow(["donor_id", "PIRCHE_II", "PIRCHE_II_A", "PIRCHE_II_B", "PIRCHE_II_C", "PIRCHE_II_DRB1", "PIRCHE_II_DQB1"])
+
+        for match_result in match_results:
+            p2_scores = match_result['pircheII_scores']
+            writer.writerow([str(match_result['id']), p2_scores['sum'], p2_scores['A'], p2_scores['B'], p2_scores['C'], p2_scores['DRB1'], p2_scores['DQB1']])
+
+
+def parse_response_multi(response_text, id_list, results):
+    data = {}
+    mapping = {}
+    header = 2
+    try:
+        lines = response_text.splitlines()
+        for line in lines:
+            cols = line.strip().split(",")
+            if header == 1:
+                for idx, k in enumerate(cols):
+                    mapping[k] = idx
+            if not header > 0:
+                id = cols[0]
+                if id in id_list:
+                    real_don_id = id_list[id]["d_id"][0]
+                    cols[0] = real_don_id
+                    data[real_don_id] = cols
+            header -= 1
+    except UnicodeDecodeError:
+        print("Skip")
+
+    for key in data:
+
+        new_row = []
+        new_row.append(data[key][0])  # id
+        new_row.append(data[key][28])  # pirche II sum
+
+        new_row.append(get_column_score(data[key], mapping, "DRB1_Presents_A_Epitopes") + get_column_score(data[key], mapping, "DRB3_Presents_A_Epitopes") + get_column_score(data[key], mapping, "DRB4_Presents_A_Epitopes") + get_column_score(data[key], mapping, "DRB5_Presents_A_Epitopes") + get_column_score(data[key], mapping, "DQA1_DQB1_Presents_A_Epitopes") + get_column_score(data[key], mapping, "DPA1_DPB1_Presents_A_Epitopes"))
+        new_row.append(get_column_score(data[key], mapping, "DRB1_Presents_B_Epitopes") + get_column_score(data[key], mapping, "DRB3_Presents_B_Epitopes") + get_column_score(data[key], mapping, "DRB4_Presents_B_Epitopes") + get_column_score(data[key], mapping, "DRB5_Presents_B_Epitopes") + get_column_score(data[key], mapping, "DQA1_DQB1_Presents_B_Epitopes") + get_column_score(data[key], mapping, "DPA1_DPB1_Presents_B_Epitopes"))
+        new_row.append(get_column_score(data[key], mapping, "DRB1_Presents_C_Epitopes") + get_column_score(data[key], mapping, "DRB3_Presents_C_Epitopes") + get_column_score(data[key], mapping, "DRB4_Presents_C_Epitopes") + get_column_score(data[key], mapping, "DRB5_Presents_C_Epitopes") + get_column_score(data[key], mapping, "DQA1_DQB1_Presents_C_Epitopes") + get_column_score(data[key], mapping, "DPA1_DPB1_Presents_C_Epitopes"))
+        new_row.append(get_column_score(data[key], mapping, "DRB1_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DRB3_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DRB4_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DRB5_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DQA1_DQB1_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DPA1_DPB1_Presents_DRB1_Epitopes"))
+        new_row.append(get_column_score(data[key], mapping, "DRB1_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DRB3_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DRB4_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DRB5_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DQA1_DQB1_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DPA1_DPB1_Presents_DQB1_Epitopes"))
+
+        results.append(new_row)
+
+
+def get_column_score(cols, mapping, col_name):
+    if col_name in mapping:
+        score = 0
+        col = cols[mapping[col_name]]
+        peps = col.split("|")
+        for pep in peps:
+            if "[" in pep and not "{d}" in pep:
+                s = pep.split("[")[1]
+                s = float(s.split("]")[0])
+                score += s
+        return score
+    return -1
+
+def write_results_multi(results):
+
+    with open(args.output, "w") as output:
+        writer = csv.writer(output, delimiter=';')
+        writer.writerow(["donor_id", "PIRCHE_II", "PIRCHE_II_A", "PIRCHE_II_B", "PIRCHE_II_C", "PIRCHE_II_DRB1", "PIRCHE_II_DQB1"])
+
+        for result in results:
+            writer.writerow(result)
+
 
 if __name__ == '__main__':
 
@@ -562,7 +746,9 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--output", help="output file name", required=True)
     parser.add_argument("-a", "--anonymization", help="Enable anonymization. Default - True - anonymization enabled", default=True)
     parser.add_argument("-s", "--salt", help="Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times.")
-    parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 5.", default=5)
+    parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 3.", default=5)
+    parser.add_argument("-rm", "--requestmode", help="Single (single) or multiple (multi) patient donor pairs per request. Default - multi.", type=str, default="multi")
+    parser.add_argument("-rs", "--requestsize", help="Max number of patient donor pairs per request for multi request setting. Max 500. Default - 300.", type=int, default=300)
     parser.add_argument("-pp", "--population", help="Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).", type=str, default="NMDP EUR haplotypes (2007)")
     parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table file name and path. Default - hla_nom_g.txt ", default="hla_nom_g.txt")
     parser.add_argument("-ds", "--dstable", help="HLA dna ser reference table file and path. Default - rel_dna_ser.txt", default="rel_dna_ser.txt")
@@ -584,6 +770,8 @@ if __name__ == '__main__':
     if dev:
         print("dev mode active")
 
+    print("Initialize base data...")
+
     g_groups_global = build_g_groups()
     dna_ser_table_global = build_dna_ser_table()
     if args.anonymization:
@@ -600,6 +788,7 @@ if __name__ == '__main__':
                       'did,dA1,dA2,dB1,dB2,dC1,dC2,dDRB11,dDRB12,dDRB31,dDRB32,dDRB41,dDRB42,dDRB51,dDRB52,' \
                       'dDQA11,dDQA12,dDQB11,dDQB12,dDPA11,dDPA12,dDPB11,dDPB12'
 
+    print("Import and parse data...")
     with open(args.input, 'r') as csv_file:
         csv_reader = csv.DictReader(csv_file)
         rawHeader = csv_reader.fieldnames
@@ -621,28 +810,46 @@ if __name__ == '__main__':
         else:
             print("CSV file provided does not match expected format.")
 
-    api_requests_data = get_api_requests_data(raw_csv_data, genotype_data)
-
-    results = []
-
     proxies = {
         "http": args.proxyhttp,
         "https": args.proxyhttps
     }
 
-    for api_request_data in api_requests_data:
-        response = rest_request(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"], proxies)
-        if response.status_code == 200:
-            response_raw = response.json()
-            response_raw_p1 = response_raw["pircheI"]
-            response_raw_p2 = response_raw["pircheII"]
-            if "id_map" in api_request_data and len(response_raw_p1.keys()) > 0 and len(response_raw_p1.values()) and len(response_raw_p2.values()) > 0:
-                if list(response_raw_p1.keys())[0] == api_request_data["id_map"]["d_id"][1]:
-                    result_data = {'id': api_request_data["id_map"]["d_id"][0], 'pircheI_scores': list(response_raw_p1.values())[0], 'pircheII_scores': list(response_raw_p2.values())[0]}
-                    print(result_data)
-                    results.append(result_data)
-                else:
-                    print('ERROR: request(' + api_request_data["id_map"]["d_id"][1] + ') and response (' + list(response_raw_p1.keys())[0] + ') ids do not match. Result for donor_ID (' + api_request_data["id_map"]["d_id"][0] + ') skipped.')
-        else:
-            print('ERROR: a request failed')
-    write_results(results)
+    results = []
+
+    if args.requestmode == "multi":
+        print("Generating smoke data...")
+        api_request_data = get_api_request_data_multi(raw_csv_data, genotype_data, proxies)
+        print("Performing requests and parsing results...")
+        numberRequests = str(len(api_request_data["api_payloads"]))
+        requestCount = 1
+        for api_payload in api_request_data["api_payloads"]:
+            print("Running request #", requestCount, " of ", numberRequests)
+            requestCount += 1
+            response = rest_request(args.url, args.user, args.password, args.apikey, api_payload, proxies)
+
+            if response.status_code == 200:
+                parse_response_multi(response.text, api_request_data["id_list"], results)
+            else:
+                print('ERROR: a request failed')
+
+        print("Writing results...")
+        write_results_multi(results)
+
+    elif args.requestmode == "single":
+        print("Generating smoke data...")
+        api_requests_data = get_api_requests_data_single(raw_csv_data, genotype_data)
+        print("Performing requests and parsing results...")
+        numberRequests = str(len(api_requests_data))
+        requestCount = 1
+        for api_request_data in api_requests_data:
+            print("Running request #", requestCount, " of ", numberRequests)
+            requestCount += 1
+            response = rest_request(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"], proxies)
+            if response.status_code == 200:
+                parse_response_single(response.json(), api_request_data, results)
+            else:
+                print('ERROR: a request failed')
+
+        print("Writing results...")
+        write_results_single(results)
