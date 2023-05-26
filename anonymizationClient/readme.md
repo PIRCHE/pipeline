@@ -58,7 +58,7 @@ Parameters:
 <sup>5</sup> if haplotype table file is changed format and population must be changed accordingly; threshold might be adjusted as well<br>
 
 Example call parameters (with anonymization enabled and using default haplotype table values):<br>
-`-url https://www.pirche.com -key apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass`
+`-url https://www.pirche.com -k apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass`
 
 Example call (with anonymization enabled and using custom haplotype table values):<br>
-`-url https://www.pirche.com -key apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass -ht 2011_haplotypes.xls -hf L*XX:XX -hp EURCAU -hth 0.7`
+`-url https://www.pirche.com -k apikey -i importTemplate.csv -o PIRCHE_results.csv -s xyz123pass -ht 2011_haplotypes.xls -hf L*XX:XX -hp EURCAU -hth 0.7`
