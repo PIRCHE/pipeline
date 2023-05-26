@@ -10,7 +10,7 @@ import uuid
 import itertools
 
 
-def rest_request(url, username, password, api_key, api_req_payload, proxies):
+def rest_request_pirche(url, username, password, api_key, api_req_payload, proxies):
 
     headers = auth_request(url, username, password, api_key, proxies)
 
@@ -21,6 +21,23 @@ def rest_request(url, username, password, api_key, api_req_payload, proxies):
         r = requests.post(url + "/pirche/rest/sot/multipatientmatch", headers=headers, proxies=proxies, data=api_req_payload)
     elif args.requestmode == "single":
         r = requests.post(url + "/pirche/rest/sot/api/match", headers=headers, proxies=proxies, json=api_req_payload)
+
+    if verbose:
+        print('api_url: ' + r.url)
+        print('api_req_status: ', r.status_code)
+        print("api_req_response: ", r.text)
+
+    return r
+
+
+def rest_request_matchmaker(url, username, password, api_key, api_req_payload, proxies):
+
+    headers = auth_request(url, username, password, api_key, proxies)
+
+    if verbose:
+        print("api_req_payload:", json.dumps(api_req_payload))
+
+    r = requests.post(url + "/pirche/rest/matchmaker/multimatch", headers=headers, proxies=proxies, data=api_req_payload)
 
     if verbose:
         print('api_url: ' + r.url)
@@ -673,7 +690,7 @@ def write_results_single(match_results):
             writer.writerow([str(match_result['id']), p2_scores['sum'], p2_scores['A'], p2_scores['B'], p2_scores['C'], p2_scores['DRB1'], p2_scores['DQB1']])
 
 
-def parse_response_multi(response_text, id_list, results):
+def fetch_data(response_text, id_list):
     data = {}
     mapping = {}
     header = 2
@@ -693,7 +710,11 @@ def parse_response_multi(response_text, id_list, results):
             header -= 1
     except UnicodeDecodeError:
         print("Skip")
+    return data, mapping
 
+
+def parse_pirche_response_multi(response_text, id_list, results):
+    data, mapping = fetch_data(response_text, id_list)
     for key in data:
 
         new_row = []
@@ -706,6 +727,12 @@ def parse_response_multi(response_text, id_list, results):
         new_row.append(get_column_score(data[key], mapping, "DRB1_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DRB3_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DRB4_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DRB5_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DQA1_DQB1_Presents_DRB1_Epitopes") + get_column_score(data[key], mapping, "DPA1_DPB1_Presents_DRB1_Epitopes"))
         new_row.append(get_column_score(data[key], mapping, "DRB1_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DRB3_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DRB4_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DRB5_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DQA1_DQB1_Presents_DQB1_Epitopes") + get_column_score(data[key], mapping, "DPA1_DPB1_Presents_DQB1_Epitopes"))
 
+        results.append(new_row)
+
+def parse_matchmaker_response_multi(response_text, id_list, results):
+    data, mapping = fetch_data(response_text, id_list)
+    for key in data:
+        new_row = [data[key][0], data[key][27]]
         results.append(new_row)
 
 
@@ -722,11 +749,15 @@ def get_column_score(cols, mapping, col_name):
         return score
     return -1
 
-def write_results_multi(results):
+
+def write_results_multi(results, mode="pirche"):
 
     with open(args.output, "w") as output:
         writer = csv.writer(output, delimiter=';')
-        writer.writerow(["donor_id", "PIRCHE_II", "PIRCHE_II_A", "PIRCHE_II_B", "PIRCHE_II_C", "PIRCHE_II_DRB1", "PIRCHE_II_DQB1"])
+        if mode == "pirche":
+            writer.writerow(["donor_id", "PIRCHE_II", "PIRCHE_II_A", "PIRCHE_II_B", "PIRCHE_II_C", "PIRCHE_II_DRB1", "PIRCHE_II_DQB1"])
+        elif mode == "matchmaker":
+            writer.writerow(["donor_id", "Eplets"])
 
         for result in results:
             writer.writerow(result)
@@ -748,6 +779,7 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--salt", help="Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times.")
     parser.add_argument("-ka", "--kanonymization", help="Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 3.", default=5)
     parser.add_argument("-rm", "--requestmode", help="Single (single) or multiple (multi) patient donor pairs per request. Default - multi.", type=str, default="multi")
+    parser.add_argument("-mm", "--matchmode", help="PIRCHE (pirche) or HLA Matchmaker (matchmaker). Default - pirche.", type=str, default="pirche")
     parser.add_argument("-rs", "--requestsize", help="Max number of patient donor pairs per request for multi request setting. Max 500. Default - 300.", type=int, default=300)
     parser.add_argument("-pp", "--population", help="Population for HLA typing data provided (needed for low res high res conversion). Default - NMDP EUR haplotypes (2007).", type=str, default="NMDP EUR haplotypes (2007)")
     parser.add_argument("-gg", "--ggroups", help="HLA g-groups reference table file name and path. Default - hla_nom_g.txt ", default="hla_nom_g.txt")
@@ -826,15 +858,23 @@ if __name__ == '__main__':
         for api_payload in api_request_data["api_payloads"]:
             print("Running request #", requestCount, " of ", numberRequests)
             requestCount += 1
-            response = rest_request(args.url, args.user, args.password, args.apikey, api_payload, proxies)
+            if args.matchmode == "pirche":
+                response = rest_request_pirche(args.url, args.user, args.password, args.apikey, api_payload, proxies)
+            elif args.matchmode == "matchmaker":
+                response = rest_request_matchmaker(args.url, args.user, args.password, args.apikey, api_payload, proxies)
+            else:
+                print('ERROR: matchmode ' + args.matchmode + ' unsupported')
 
             if response.status_code == 200:
-                parse_response_multi(response.text, api_request_data["id_list"], results)
+                if args.matchmode == "pirche":
+                    parse_pirche_response_multi(response.text, api_request_data["id_list"], results)
+                elif args.matchmode == "matchmaker":
+                    parse_matchmaker_response_multi(response.text, api_request_data["id_list"], results)
             else:
                 print('ERROR: a request failed')
 
         print("Writing results...")
-        write_results_multi(results)
+        write_results_multi(results, mode=args.matchmode)
 
     elif args.requestmode == "single":
         print("Generating smoke data...")
@@ -845,7 +885,11 @@ if __name__ == '__main__':
         for api_request_data in api_requests_data:
             print("Running request #", requestCount, " of ", numberRequests)
             requestCount += 1
-            response = rest_request(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"], proxies)
+            if args.matchmode == "pirche":
+                response = rest_request_pirche(args.url, args.user, args.password, args.apikey, api_request_data["api_payload"], proxies)
+            else:
+                print('ERROR: matchmode ' + args.matchmode + ' unsupported with request mode ' + args.requestmode)
+
             if response.status_code == 200:
                 parse_response_single(response.json(), api_request_data, results)
             else:
