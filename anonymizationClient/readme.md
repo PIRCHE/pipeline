@@ -37,7 +37,7 @@ Parameters:
 | -o    | --output          | x        | Output file name                                                                                                                          |
 | -a    | --anonymization   | d        | Enable anonymization. Default - True - Anonymization enabled                                                                              |
 | -s    | --salt            | x        | Salt (password) used to anonymize input data. Use identical password when submitting same HLA data set multiple times. <sup>3</sup>       |
-| -k    | --kanonymization  | d        | Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 3. <sup>4</sup>                                  |
+| -ka   | --kanonymization  | d        | Number of smoke hla data sets (genotypes) generated per patient and per donor. Default - 3. <sup>4</sup>                                  |
 | -rm   | --requestmode     | d        | Single (single) or multiple (multi) patient donor pairs per request. Default - multi.                                                     |
 | -mm   | --matchmode       | d        | Calculate either PIRCHE (pirche) or HLA Matchmaker (matchmaker) scores. Default - pirche.                                                 |
 | -rs   | --requestsize     | d        | Max number of patient donor pairs per request for multi request setting. Max 500. Default - 300.                                          |
