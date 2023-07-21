@@ -368,7 +368,7 @@ def check_unsupported_loci(raw_tx_data):
             or raw_tx_data["dDPA11"] or raw_tx_data["dDPA12"] \
             or raw_tx_data["dDPB11"] or raw_tx_data["dDPB12"]:
         print('INFO: Only the locus A, B, C, DRB1 and DQB1 are supported. '
-              'The hla data of other locus will be ignored.')
+              'The hla data of other locus will be ignored. Patient/Donor pair - patientId:', raw_tx_data["pid"] + ' donorId:', raw_tx_data["did"])
 
 def check_nmdp_codes(raw_tx_data):
     if is_nmdp_code(raw_tx_data["pA1"]) or is_nmdp_code(raw_tx_data["pA2"]) \
@@ -381,7 +381,7 @@ def check_nmdp_codes(raw_tx_data):
             or is_nmdp_code(raw_tx_data["dC1"]) or is_nmdp_code(raw_tx_data["dC2"]) \
             or is_nmdp_code(raw_tx_data["dDRB11"]) or is_nmdp_code(raw_tx_data["dDRB12"]) \
             or is_nmdp_code(raw_tx_data["dDQB11"]) or is_nmdp_code(raw_tx_data["dDQB12"]):
-            print('ERROR: HLA typings containing NMDP codes are not supported.')
+            print('ERROR: HLA typings containing NMDP codes are not supported. Patient/Donor pair - patientId:', raw_tx_data["pid"] + ' donorId:', raw_tx_data["did"])
             exit()
 
 def is_nmdp_code(raw_tx_data_value):
