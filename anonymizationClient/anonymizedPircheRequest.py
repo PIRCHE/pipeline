@@ -375,9 +375,14 @@ def check_nmdp_codes(raw_tx_data):
             or is_nmdp_code(raw_tx_data["pB1"]) or is_nmdp_code(raw_tx_data["pB2"]) \
             or is_nmdp_code(raw_tx_data["pC1"]) or is_nmdp_code(raw_tx_data["pC2"]) \
             or is_nmdp_code(raw_tx_data["pDRB11"]) or is_nmdp_code(raw_tx_data["pDRB12"]) \
-            or is_nmdp_code(raw_tx_data["pDQB11"]) or is_nmdp_code(raw_tx_data["pDQB12"]):
-        print('ERROR: HLA typings containing NMDP codes are not supported.')
-        exit()
+            or is_nmdp_code(raw_tx_data["pDQB11"]) or is_nmdp_code(raw_tx_data["pDQB12"]) \
+            or is_nmdp_code(raw_tx_data["dA1"]) or is_nmdp_code(raw_tx_data["dA2"]) \
+            or is_nmdp_code(raw_tx_data["dB1"]) or is_nmdp_code(raw_tx_data["dB2"]) \
+            or is_nmdp_code(raw_tx_data["dC1"]) or is_nmdp_code(raw_tx_data["dC2"]) \
+            or is_nmdp_code(raw_tx_data["dDRB11"]) or is_nmdp_code(raw_tx_data["dDRB12"]) \
+            or is_nmdp_code(raw_tx_data["dDQB11"]) or is_nmdp_code(raw_tx_data["dDQB12"]):
+            print('ERROR: HLA typings containing NMDP codes are not supported.')
+            exit()
 
 def is_nmdp_code(raw_tx_data_value):
     is_nmdp = False
