@@ -106,7 +106,7 @@ def get_api_request_data_multi(raw_input_data, genotype_data, proxies):
 
     pop_id = request_population_id(args.url, args.user, args.password, args.apikey, proxies, args.population)
 
-    header = "0.5,500,1000,0.01,0," + pop_id + ",false,false,false,false,false,false,2,2,2,2,2,150,true,true,false,0,0,false|"
+    header = "0.5,500,1000,0.01,0," + pop_id + ",false,false,false,false,false,false,2,2,2,2,2,150,true,true,false|"
     body = ""
 
     for content in raw_input_data.values():
